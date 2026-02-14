@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { WakeupNotice } from "@/components/auth/wakeup-notice";
 
 interface HeroProps {
     email: string;
@@ -106,6 +107,8 @@ export function Hero({ email, setEmail, fullName, setFullName, loading, onSubmit
                             >
                                 {loading ? "Creating your account..." : "Get Started Now"}
                             </Button>
+
+                            {loading && <WakeupNotice />}
                         </form>
 
                         {message && (

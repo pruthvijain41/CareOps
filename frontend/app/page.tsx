@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { healthCheck } from "@/lib/api";
 import { Navbar } from "@/components/landing/navbar";
 import { Hero } from "@/components/landing/hero";
 import { ProblemSection } from "@/components/landing/problem-section";
@@ -17,6 +18,20 @@ export default function LandingPage() {
   const [fullName, setFullName] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  async function ensureBackendAwake() {
+    // Try up to 20 times (approx 1 minute)
+    for (let i = 0; i < 20; i++) {
+      try {
+        await healthCheck();
+        return true;
+      } catch (e) {
+        // Wait 3 seconds before next attempt
+        await new Promise(resolve => setTimeout(resolve, 3000));
+      }
+    }
+    return false;
+  }
 
   async function handleSignUp(e: React.FormEvent) {
     e.preventDefault();
@@ -55,6 +70,9 @@ export default function LandingPage() {
         setMessage({ type: "success", text: "Account created! Please check your email to confirm, then log in." });
         return;
       }
+
+      // NEW: Wait for backend to wake up
+      await ensureBackendAwake();
 
       // Signed in — redirect to onboarding
       router.push("/onboarding");
