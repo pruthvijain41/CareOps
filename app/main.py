@@ -1,5 +1,6 @@
 """
 CareOps — FastAPI Application Entry Point
+Triggering fresh Render deploy.
 """
 
 from contextlib import asynccontextmanager
