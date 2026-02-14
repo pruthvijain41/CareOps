@@ -14,23 +14,12 @@ cd whatsapp-bridge
 npm run build
 cd ..
 
-# ── Start FastAPI backend FIRST (so Render detects port 10000 as primary) ────
-echo "🔧 Starting FastAPI backend on port $PORT..."
-uvicorn app.main:app --host 0.0.0.0 --port "${PORT:-8000}" --limit-max-requests 1000 &
-BACKEND_PID=$!
-echo "🔧 FastAPI backend started (PID: $BACKEND_PID)"
-
-# Wait for FastAPI to bind the port before starting the bridge
-sleep 3
-
-# ── Start WhatsApp Bridge in background (compiled JS — no ts-node) ───────────
-echo "📱 Starting WhatsApp bridge..."
-cd whatsapp-bridge
-WHATSAPP_BRIDGE_PORT=3001 node dist/index.js &
+# ── Start WhatsApp Bridge with a delay (so FastAPI binds port 10000 first) ───
+echo "📱 Scheduling WhatsApp bridge start (5s delay)..."
+(sleep 5 && cd whatsapp-bridge && WHATSAPP_BRIDGE_PORT=3001 node dist/index.js) &
 BRIDGE_PID=$!
-echo "📱 WhatsApp bridge started (PID: $BRIDGE_PID)"
-cd ..
+echo "📱 WhatsApp bridge scheduled (PID: $BRIDGE_PID)"
 
-# ── Wait for either process to exit ─────────────────────────────────────────
-# If FastAPI dies, the whole service should restart
-wait $BACKEND_PID
+# ── Start FastAPI backend as main process (exec replaces shell) ──────────────
+echo "🔧 Starting FastAPI backend on port $PORT..."
+exec uvicorn app.main:app --host 0.0.0.0 --port "${PORT:-8000}" --limit-max-requests 1000
