@@ -314,7 +314,7 @@ class AutomationEngine:
             return {"status": "skipped", "reason": "no active forms"}
 
         # Generate public form URL
-        form_url = f"http://localhost:3000/f/{form['id']}"
+        form_url = f"{self.settings.FRONTEND_URL}/f/{form['id']}"
         form_title = form.get("title", "Form")
 
         try:

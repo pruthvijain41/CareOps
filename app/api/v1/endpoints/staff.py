@@ -241,7 +241,7 @@ Here are your login credentials:
 Email: {data.email}
 Password: {password}
 
-Login here: {settings.CORS_ORIGINS[0] if settings.CORS_ORIGINS else 'http://localhost:3000'}/login
+Login here: {settings.FRONTEND_URL}/login
 
 Your permissions:
 - Inbox: {"✅ Enabled" if permissions_dict.get("inbox") else "❌ Disabled"}

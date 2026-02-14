@@ -233,7 +233,7 @@ class AutomationScheduler:
                     engine = AutomationEngine(self.settings, db)
 
                     form_title = action_result.get("form_title", "Form")
-                    form_url = f"http://localhost:3000/f/{form_id}"
+                    form_url = f"{self.settings.FRONTEND_URL}/f/{form_id}"
 
                     await engine.fire_trigger(
                         workspace_id,
