@@ -25,16 +25,12 @@ export default function LoginPage() {
         // Try up to 20 times (approx 1 minute)
         for (let i = 0; i < 20; i++) {
             try {
-                // Use a direct fetch/healthCheck but verify the response matches our API
-                // Adding a timestamp to bust any caches
                 const res = await healthCheck();
-
                 // Specifically check for our backend's signature
                 if (res && res.status === "healthy" && res.service === "careops") {
                     return true;
                 }
-
-                // If we got a response but it's not ours (e.g. Render spin-up page), wait
+                // If it's something else (e.g. Render spin-up page), wait
                 await new Promise(resolve => setTimeout(resolve, 3000));
             } catch (e) {
                 // Network error or timeout — backend is still booting
@@ -59,7 +55,10 @@ export default function LoginPage() {
             if (authError) throw authError;
 
             // Wait for backend to wake up before profile fetches
-            await ensureBackendAwake();
+            const awake = await ensureBackendAwake();
+            if (!awake) {
+                throw new Error("The server is taking too long to wake up. Please refresh and try again.");
+            }
 
             // Fetch profile with workspace details
             const { data: { user } } = await supabase.auth.getUser();
@@ -144,7 +143,10 @@ export default function LoginPage() {
             if (authError) throw authError;
 
             // Wait for backend to wake up
-            await ensureBackendAwake();
+            const awake = await ensureBackendAwake();
+            if (!awake) {
+                throw new Error("The server is taking too long to wake up. Please refresh and try again.");
+            }
 
             if (data.user) {
                 // Auto-login after signup

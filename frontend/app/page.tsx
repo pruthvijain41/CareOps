@@ -23,15 +23,12 @@ export default function LandingPage() {
     // Try up to 20 times (approx 1 minute)
     for (let i = 0; i < 20; i++) {
       try {
-        // Use healthCheck and verify with specific signature
         const res = await healthCheck();
         if (res && res.status === "healthy" && res.service === "careops") {
           return true;
         }
-        // If it's something else (e.g. Render spin-up page), wait
         await new Promise(resolve => setTimeout(resolve, 3000));
       } catch (e) {
-        // Network error/timeout — backend is still booting
         await new Promise(resolve => setTimeout(resolve, 3000));
       }
     }
@@ -77,7 +74,10 @@ export default function LandingPage() {
       }
 
       // NEW: Wait for backend to wake up
-      await ensureBackendAwake();
+      const awake = await ensureBackendAwake();
+      if (!awake) {
+        throw new Error("The server is taking too long to wake up. Please refresh and try again.");
+      }
 
       // Signed in — redirect to onboarding
       router.push("/onboarding");

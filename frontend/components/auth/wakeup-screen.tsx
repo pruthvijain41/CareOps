@@ -31,12 +31,17 @@ export function WakeupGate({ children }: { children: React.ReactNode }) {
     const checkBackend = useCallback(async () => {
         try {
             const res = await healthCheck();
+            // Strictly check signature. If degraded, it means DB is not reachable.
+            // We should wait until it's 'healthy'.
             if (res && res.status === "healthy" && res.service === "careops") {
                 setIsAwake(true);
                 return true;
             }
+            if (res && res.status === "degraded") {
+                console.warn("Backend is awake but degraded (DB issue). Waiting...");
+            }
         } catch {
-            // Backend still booting
+            // Backend still booting or network error
         }
         return false;
     }, []);
@@ -49,8 +54,9 @@ export function WakeupGate({ children }: { children: React.ReactNode }) {
             const ok = await checkBackend();
             if (ok || cancelled) return;
 
-            // Retry every 3 seconds, up to 40 times (~2 min)
-            for (let i = 0; i < 40; i++) {
+            // Retry every 3 seconds, up to 60 times (~3 min)
+            // cold starts on Render can sometimes take a while if multiple services wake up
+            for (let i = 0; i < 60; i++) {
                 if (cancelled) return;
                 await new Promise((r) => setTimeout(r, 3000));
                 setAttempt(i + 1);
