@@ -386,6 +386,11 @@ export default function BookingsPage() {
     const [loading, setLoading] = useState(true);
     const [copied, setCopied] = useState(false);
     const [saving, setSaving] = useState(false);
+    const [isMounted, setIsMounted] = useState(false);
+
+    useEffect(() => {
+        setIsMounted(true);
+    }, []);
 
     // Schedule state
     const [schedule, setSchedule] = useState<any>({});
@@ -558,6 +563,14 @@ export default function BookingsPage() {
             toast.error("Failed to remove service");
         }
     };
+
+    if (!isMounted) {
+        return (
+            <div className="flex items-center justify-center py-32">
+                <Loader2 className="w-6 h-6 animate-spin text-slate-200" />
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6">
