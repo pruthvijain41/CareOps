@@ -20,6 +20,7 @@ import {
     Bell, CheckCircle2, XCircle, AlertTriangle, X, Loader2,
 } from "lucide-react";
 import api from "@/lib/api";
+import { WakeupGate } from "@/components/auth/wakeup-screen";
 
 /* ─── Types ──────────────────────────────────────────────────────────────── */
 
@@ -262,178 +263,180 @@ export default function DashboardLayout({
     };
 
     return (
-        <div className="flex h-screen overflow-hidden bg-white text-slate-900 font-sans selection:bg-slate-900 selection:text-white">
-            {/* ── Sidebar ────────────────────────────────────────────────── */}
-            <aside className="w-[260px] border-r border-slate-100 bg-slate-50/40 flex flex-col">
-                {/* Workspace header */}
-                <div className="px-6 pt-8 pb-6">
-                    <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-slate-900 flex items-center justify-center shadow-lg shadow-slate-200">
-                            <span className="text-white font-display font-bold text-base tracking-tighter">C</span>
-                        </div>
-                        <div className="overflow-hidden flex-1">
-                            <h2 className="font-display font-bold text-base tracking-tight text-slate-900 truncate leading-none">
-                                {profile?.workspaceName ?? "CareOps"}
-                            </h2>
-                            <span className="text-[10px] font-bold text-slate-400 tracking-tight capitalize">
-                                {profile?.role ?? "Workspace"}
-                            </span>
-                        </div>
-                        {/* Notification bell */}
-                        <div className="relative" ref={notifRef}>
-                            <button
-                                onClick={() => {
-                                    const nextShow = !showNotifications;
-                                    setShowNotifications(nextShow);
-                                    if (nextShow) {
-                                        fetchNotifications();
-                                        // Mark all as seen
-                                        localStorage.setItem("careops_notifications_seen_at", new Date().toISOString());
-                                        setUnreadCount(0);
-                                    }
-                                }}
-                                className={`relative w-8 h-8 rounded-xl flex items-center justify-center transition-colors ${showNotifications ? "bg-slate-200 text-slate-900" : "text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-                                    }`}
-                            >
-                                <Bell className="w-4 h-4" />
-                                {unreadCount > 0 && (
-                                    <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-rose-500 text-[9px] font-bold text-white flex items-center justify-center">
-                                        {unreadCount > 9 ? "9+" : unreadCount}
-                                    </span>
-                                )}
-                            </button>
+        <WakeupGate>
+            <div className="flex h-screen overflow-hidden bg-white text-slate-900 font-sans selection:bg-slate-900 selection:text-white">
+                {/* ── Sidebar ────────────────────────────────────────────────── */}
+                <aside className="w-[260px] border-r border-slate-100 bg-slate-50/40 flex flex-col">
+                    {/* Workspace header */}
+                    <div className="px-6 pt-8 pb-6">
+                        <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-xl bg-slate-900 flex items-center justify-center shadow-lg shadow-slate-200">
+                                <span className="text-white font-display font-bold text-base tracking-tighter">C</span>
+                            </div>
+                            <div className="overflow-hidden flex-1">
+                                <h2 className="font-display font-bold text-base tracking-tight text-slate-900 truncate leading-none">
+                                    {profile?.workspaceName ?? "CareOps"}
+                                </h2>
+                                <span className="text-[10px] font-bold text-slate-400 tracking-tight capitalize">
+                                    {profile?.role ?? "Workspace"}
+                                </span>
+                            </div>
+                            {/* Notification bell */}
+                            <div className="relative" ref={notifRef}>
+                                <button
+                                    onClick={() => {
+                                        const nextShow = !showNotifications;
+                                        setShowNotifications(nextShow);
+                                        if (nextShow) {
+                                            fetchNotifications();
+                                            // Mark all as seen
+                                            localStorage.setItem("careops_notifications_seen_at", new Date().toISOString());
+                                            setUnreadCount(0);
+                                        }
+                                    }}
+                                    className={`relative w-8 h-8 rounded-xl flex items-center justify-center transition-colors ${showNotifications ? "bg-slate-200 text-slate-900" : "text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                                        }`}
+                                >
+                                    <Bell className="w-4 h-4" />
+                                    {unreadCount > 0 && (
+                                        <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-rose-500 text-[9px] font-bold text-white flex items-center justify-center">
+                                            {unreadCount > 9 ? "9+" : unreadCount}
+                                        </span>
+                                    )}
+                                </button>
 
-                            {/* Notification Panel */}
-                            {showNotifications && (
-                                <div className="absolute top-10 left-0 w-80 bg-white rounded-2xl border border-slate-100 shadow-2xl shadow-slate-200/50 z-50 overflow-hidden animate-in slide-in-from-top-2 duration-200">
-                                    {/* Panel header */}
-                                    <div className="flex items-center justify-between px-4 py-3 border-b border-slate-50">
-                                        <h3 className="text-[13px] font-semibold text-slate-900">Notifications</h3>
-                                        <button
-                                            onClick={() => setShowNotifications(false)}
-                                            className="w-6 h-6 rounded-lg flex items-center justify-center text-slate-300 hover:text-slate-500 hover:bg-slate-50 transition-colors"
-                                        >
-                                            <X className="w-3.5 h-3.5" />
-                                        </button>
-                                    </div>
+                                {/* Notification Panel */}
+                                {showNotifications && (
+                                    <div className="absolute top-10 left-0 w-80 bg-white rounded-2xl border border-slate-100 shadow-2xl shadow-slate-200/50 z-50 overflow-hidden animate-in slide-in-from-top-2 duration-200">
+                                        {/* Panel header */}
+                                        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-50">
+                                            <h3 className="text-[13px] font-semibold text-slate-900">Notifications</h3>
+                                            <button
+                                                onClick={() => setShowNotifications(false)}
+                                                className="w-6 h-6 rounded-lg flex items-center justify-center text-slate-300 hover:text-slate-500 hover:bg-slate-50 transition-colors"
+                                            >
+                                                <X className="w-3.5 h-3.5" />
+                                            </button>
+                                        </div>
 
-                                    {/* Panel body */}
-                                    <div className="max-h-[360px] overflow-y-auto">
-                                        {notificationsLoading ? (
-                                            <div className="flex items-center justify-center py-10 gap-2">
-                                                <Loader2 className="w-4 h-4 animate-spin text-slate-300" />
-                                                <span className="text-[12px] text-slate-300 font-medium">Loading...</span>
-                                            </div>
-                                        ) : notifications.length === 0 ? (
-                                            <div className="py-10 text-center">
-                                                <Bell className="w-8 h-8 text-slate-200 mx-auto mb-2" />
-                                                <p className="text-[13px] text-slate-400 font-medium">No notifications yet</p>
-                                                <p className="text-[11px] text-slate-300 mt-0.5">Activity will appear here</p>
-                                            </div>
-                                        ) : (
-                                            notifications.slice(0, 20).map((notif) => (
-                                                <div
-                                                    key={notif.id}
-                                                    className="flex items-start gap-3 px-4 py-3 hover:bg-slate-50/50 transition-colors border-b border-slate-50 last:border-0"
-                                                >
-                                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${statusBg(notif.status)}`}>
-                                                        {statusIcon(notif.status)}
-                                                    </div>
-                                                    <div className="flex-1 min-w-0">
-                                                        <div className="flex items-center gap-2">
-                                                            <p className="text-[12px] font-semibold text-slate-900 truncate">{notif.title}</p>
-                                                            {notif.isResolved && (
-                                                                <Badge variant="outline" className="h-4 px-1 text-[8px] uppercase tracking-wider bg-slate-50 text-slate-400 border-slate-100">
-                                                                    Resolved
-                                                                </Badge>
-                                                            )}
-                                                        </div>
-                                                        <p className="text-[11px] text-slate-400 truncate">{notif.detail}</p>
-                                                    </div>
-                                                    <span className="text-[10px] text-slate-300 font-medium shrink-0 mt-0.5">
-                                                        {notif.time ? timeAgo(notif.time) : ""}
-                                                    </span>
+                                        {/* Panel body */}
+                                        <div className="max-h-[360px] overflow-y-auto">
+                                            {notificationsLoading ? (
+                                                <div className="flex items-center justify-center py-10 gap-2">
+                                                    <Loader2 className="w-4 h-4 animate-spin text-slate-300" />
+                                                    <span className="text-[12px] text-slate-300 font-medium">Loading...</span>
                                                 </div>
-                                            ))
-                                        )}
+                                            ) : notifications.length === 0 ? (
+                                                <div className="py-10 text-center">
+                                                    <Bell className="w-8 h-8 text-slate-200 mx-auto mb-2" />
+                                                    <p className="text-[13px] text-slate-400 font-medium">No notifications yet</p>
+                                                    <p className="text-[11px] text-slate-300 mt-0.5">Activity will appear here</p>
+                                                </div>
+                                            ) : (
+                                                notifications.slice(0, 20).map((notif) => (
+                                                    <div
+                                                        key={notif.id}
+                                                        className="flex items-start gap-3 px-4 py-3 hover:bg-slate-50/50 transition-colors border-b border-slate-50 last:border-0"
+                                                    >
+                                                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${statusBg(notif.status)}`}>
+                                                            {statusIcon(notif.status)}
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex items-center gap-2">
+                                                                <p className="text-[12px] font-semibold text-slate-900 truncate">{notif.title}</p>
+                                                                {notif.isResolved && (
+                                                                    <Badge variant="outline" className="h-4 px-1 text-[8px] uppercase tracking-wider bg-slate-50 text-slate-400 border-slate-100">
+                                                                        Resolved
+                                                                    </Badge>
+                                                                )}
+                                                            </div>
+                                                            <p className="text-[11px] text-slate-400 truncate">{notif.detail}</p>
+                                                        </div>
+                                                        <span className="text-[10px] text-slate-300 font-medium shrink-0 mt-0.5">
+                                                            {notif.time ? timeAgo(notif.time) : ""}
+                                                        </span>
+                                                    </div>
+                                                ))
+                                            )}
+                                        </div>
                                     </div>
-                                </div>
-                            )}
+                                )}
+                            </div>
                         </div>
                     </div>
-                </div>
 
-                {/* Nav links */}
-                <nav className="flex-1 px-3 space-y-0.5 overflow-y-auto">
-                    <p className="px-4 pt-2 pb-3 text-[10px] font-black uppercase tracking-[0.2em] text-slate-300">Menu</p>
-                    {visibleNavItems.map((item) => {
-                        const href = `/${slug}${item.href}`;
-                        const isActive =
-                            item.href === ""
-                                ? pathname === `/${slug}`
-                                : pathname.startsWith(href);
-                        const Icon = item.icon;
+                    {/* Nav links */}
+                    <nav className="flex-1 px-3 space-y-0.5 overflow-y-auto">
+                        <p className="px-4 pt-2 pb-3 text-[10px] font-black uppercase tracking-[0.2em] text-slate-300">Menu</p>
+                        {visibleNavItems.map((item) => {
+                            const href = `/${slug}${item.href}`;
+                            const isActive =
+                                item.href === ""
+                                    ? pathname === `/${slug}`
+                                    : pathname.startsWith(href);
+                            const Icon = item.icon;
 
-                        return (
-                            <Link key={item.label} href={href}>
-                                <div className={`
+                            return (
+                                <Link key={item.label} href={href}>
+                                    <div className={`
                                     group flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 relative
                                     ${isActive
-                                        ? "bg-white text-slate-900 shadow-sm border border-slate-100"
-                                        : "text-slate-500 hover:text-slate-900 hover:bg-white/60"
-                                    }
+                                            ? "bg-white text-slate-900 shadow-sm border border-slate-100"
+                                            : "text-slate-500 hover:text-slate-900 hover:bg-white/60"
+                                        }
                                 `}>
-                                    <Icon className={`w-[18px] h-[18px] shrink-0 transition-colors ${isActive ? "text-slate-900" : "text-slate-400 group-hover:text-slate-600"}`} />
-                                    <span className={`text-[13px] tracking-tight transition-colors ${isActive ? "font-bold" : "font-medium"}`}>
-                                        {item.label}
-                                    </span>
-                                    {isActive && (
-                                        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 bg-slate-900 rounded-r-full" />
-                                    )}
-                                </div>
-                            </Link>
-                        );
-                    })}
-                </nav>
+                                        <Icon className={`w-[18px] h-[18px] shrink-0 transition-colors ${isActive ? "text-slate-900" : "text-slate-400 group-hover:text-slate-600"}`} />
+                                        <span className={`text-[13px] tracking-tight transition-colors ${isActive ? "font-bold" : "font-medium"}`}>
+                                            {item.label}
+                                        </span>
+                                        {isActive && (
+                                            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 bg-slate-900 rounded-r-full" />
+                                        )}
+                                    </div>
+                                </Link>
+                            );
+                        })}
+                    </nav>
 
-                {/* User menu */}
-                <div className="p-3 border-t border-slate-100">
-                    <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <button className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-white transition-all group text-left">
-                                <Avatar className="h-9 w-9 rounded-xl border border-slate-100 shrink-0">
-                                    <AvatarFallback className="text-[10px] font-bold uppercase tracking-wider bg-slate-900 text-white rounded-xl">
-                                        {initials}
-                                    </AvatarFallback>
-                                </Avatar>
-                                <div className="flex-1 overflow-hidden min-w-0">
-                                    <p className="font-semibold text-[13px] text-slate-900 truncate tracking-tight leading-none">
-                                        {profile?.fullName ?? profile?.email?.split('@')[0] ?? "User"}
-                                    </p>
-                                    <p className="text-[11px] text-slate-400 truncate tracking-tight mt-0.5">
-                                        {profile?.email ?? ""}
-                                    </p>
-                                </div>
-                                <ChevronDown className="w-3.5 h-3.5 text-slate-300 shrink-0 group-hover:text-slate-500 transition-colors" />
-                            </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-56 rounded-xl p-1.5 border-slate-100 shadow-xl shadow-slate-200/50">
-                            <DropdownMenuItem
-                                onClick={handleLogout}
-                                className="rounded-lg px-3 py-2.5 text-rose-600 font-semibold text-xs cursor-pointer hover:bg-rose-50 focus:bg-rose-50 transition-colors flex items-center gap-2"
-                            >
-                                <LogOut className="w-3.5 h-3.5" />
-                                Sign Out
-                            </DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                </div>
-            </aside>
+                    {/* User menu */}
+                    <div className="p-3 border-t border-slate-100">
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <button className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-white transition-all group text-left">
+                                    <Avatar className="h-9 w-9 rounded-xl border border-slate-100 shrink-0">
+                                        <AvatarFallback className="text-[10px] font-bold uppercase tracking-wider bg-slate-900 text-white rounded-xl">
+                                            {initials}
+                                        </AvatarFallback>
+                                    </Avatar>
+                                    <div className="flex-1 overflow-hidden min-w-0">
+                                        <p className="font-semibold text-[13px] text-slate-900 truncate tracking-tight leading-none">
+                                            {profile?.fullName ?? profile?.email?.split('@')[0] ?? "User"}
+                                        </p>
+                                        <p className="text-[11px] text-slate-400 truncate tracking-tight mt-0.5">
+                                            {profile?.email ?? ""}
+                                        </p>
+                                    </div>
+                                    <ChevronDown className="w-3.5 h-3.5 text-slate-300 shrink-0 group-hover:text-slate-500 transition-colors" />
+                                </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-56 rounded-xl p-1.5 border-slate-100 shadow-xl shadow-slate-200/50">
+                                <DropdownMenuItem
+                                    onClick={handleLogout}
+                                    className="rounded-lg px-3 py-2.5 text-rose-600 font-semibold text-xs cursor-pointer hover:bg-rose-50 focus:bg-rose-50 transition-colors flex items-center gap-2"
+                                >
+                                    <LogOut className="w-3.5 h-3.5" />
+                                    Sign Out
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    </div>
+                </aside>
 
-            {/* ── Main content ──────────────────────────────────────────── */}
-            <main className="flex-1 overflow-y-auto bg-white">
-                <div className="p-8 md:p-10 max-w-[1400px] mx-auto w-full">{children}</div>
-            </main>
-        </div>
+                {/* ── Main content ──────────────────────────────────────────── */}
+                <main className="flex-1 overflow-y-auto bg-white">
+                    <div className="p-8 md:p-10 max-w-[1400px] mx-auto w-full">{children}</div>
+                </main>
+            </div>
+        </WakeupGate>
     );
 }
