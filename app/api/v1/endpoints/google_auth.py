@@ -308,7 +308,7 @@ async def gcal_callback(
     except Exception as exc:
         logger.error("GCal OAuth callback failed: %s", exc)
         return RedirectResponse(
-            url=f"http://localhost:3000/settings?error=gcal_failed&detail={str(exc)[:100]}",
+            url=f"{settings.FRONTEND_URL}/settings?error=gcal_failed&detail={str(exc)[:100]}",
         )
 
     try:
@@ -317,7 +317,7 @@ async def gcal_callback(
     except Exception:
         slug = ""
 
-    return RedirectResponse(url=f"http://localhost:3000/{slug}/settings?connected=gcal")
+    return RedirectResponse(url=f"{settings.FRONTEND_URL}/{slug}/settings?connected=gcal")
 
 
 # ── Integration Status ───────────────────────────────────────────────────────

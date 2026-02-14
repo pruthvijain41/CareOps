@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     APP_NAME: str = "CareOps"
     SECRET_KEY: str = "change-me-in-production"
     CORS_ORIGINS: list[str] = ["http://localhost:3000"]
+    FRONTEND_URL: str = "http://localhost:3000"
 
     # ── Supabase ─────────────────────────────────────────────────────────
     SUPABASE_URL: str = ""
