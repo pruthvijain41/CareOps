@@ -214,23 +214,14 @@ async def gmail_callback(
         from fastapi.responses import HTMLResponse
         return HTMLResponse(content=error_html)
 
-    # Return a self-closing page — the onboarding tab polls for connection status
-    success_html = """
-    <html><head><title>Gmail Connected</title></head>
-    <body style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:system-ui;background:#fafafa;">
-        <div style="text-align:center;max-width:400px;padding:40px;">
-            <div style="font-size:48px;margin-bottom:16px;">✅</div>
-            <h2 style="color:#0f172a;margin-bottom:8px;">Gmail Connected!</h2>
-            <p style="color:#64748b;font-size:14px;margin-bottom:24px;">
-                You can close this tab and go back to the onboarding page.
-            </p>
-            <p style="color:#94a3b8;font-size:12px;">This tab will close automatically...</p>
-        </div>
-        <script>setTimeout(function(){ window.close(); }, 2000);</script>
-    </body></html>
-    """
-    from fastapi.responses import HTMLResponse
-    return HTMLResponse(content=success_html)
+    # Redirect back to workspace settings page
+    try:
+        ws = db.table("workspaces").select("slug").eq("id", workspace_id).single().execute()
+        slug = ws.data["slug"] if ws.data else ""
+    except Exception:
+        slug = ""
+
+    return RedirectResponse(url=f"{settings.FRONTEND_URL}/{slug}/settings?connected=gmail")
 
 
 # ── Google Calendar Connect ──────────────────────────────────────────────────

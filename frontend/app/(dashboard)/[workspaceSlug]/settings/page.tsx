@@ -73,14 +73,14 @@ export default function SettingsPage() {
     const connectGmail = useMutation({
         mutationFn: async () => {
             const result = await getGmailConnectUrl();
-            window.location.href = result.authorization_url;
+            window.open(result.authorization_url, "_blank");
         },
     });
 
     const connectGcal = useMutation({
         mutationFn: async () => {
             const result = await getGcalConnectUrl();
-            window.location.href = result.authorization_url;
+            window.open(result.authorization_url, "_blank");
         },
     });
 
