@@ -59,13 +59,38 @@ async function pullSessionFromSupabase() {
     }
 }
 
+// Debounce map to prevent reading files before they are fully written
+const pushTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
+
+function debouncedPushFile(fileId: string) {
+    // Clear any existing timer for this file
+    const existing = pushTimers.get(fileId);
+    if (existing) clearTimeout(existing);
+
+    // Wait 500ms after the last write event before reading the file
+    pushTimers.set(fileId, setTimeout(() => {
+        pushTimers.delete(fileId);
+        pushFileToSupabase(fileId);
+    }, 500));
+}
+
 async function pushFileToSupabase(fileId: string) {
     if (!supabase) return;
     try {
         const filePath = path.join(sessionDir, fileId);
         if (!fs.existsSync(filePath)) return;
 
-        const content = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+        const raw = fs.readFileSync(filePath, 'utf-8').trim();
+        if (!raw) return; // File is empty (still being written)
+
+        let content: any;
+        try {
+            content = JSON.parse(raw);
+        } catch {
+            // File is still being written — skip this event, debounce will retry
+            return;
+        }
+
         const { error } = await supabase
             .from('whatsapp_sessions')
             .upsert({
@@ -100,6 +125,7 @@ async function removeSessionFromSupabase() {
 let sock: any = null;
 let qrCode: string | null = null;
 let connectionState: string = 'disconnected';
+let fileWatcher: fs.FSWatcher | null = null;
 
 async function connectToWhatsApp() {
     // Pull session before starting
@@ -144,12 +170,17 @@ async function connectToWhatsApp() {
         await pushFileToSupabase('creds.json');
     });
 
-    // Also watch for other auth files (keys, etc)
+    // Close any previous file watcher to prevent duplicates
+    if (fileWatcher) {
+        fileWatcher.close();
+        fileWatcher = null;
+    }
+
+    // Watch for auth key files (pre-keys, sender-keys, etc.)
     if (fs.existsSync(sessionDir)) {
-        fs.watch(sessionDir, (eventType, filename) => {
+        fileWatcher = fs.watch(sessionDir, (eventType, filename) => {
             if (filename && filename !== 'creds.json' && filename.endsWith('.json')) {
-                // Debounce or just push on change
-                pushFileToSupabase(filename);
+                debouncedPushFile(filename);
             }
         });
     }
