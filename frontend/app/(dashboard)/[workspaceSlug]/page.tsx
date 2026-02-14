@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useWorkspaceStore, type Permissions } from "@/stores/workspace-store";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { getDashboardMetrics, getActionFeed, getIntegrationStatus, getInsights, listForms } from "@/lib/api";
@@ -64,6 +64,13 @@ interface FormItem {
     created_at: string;
 }
 
+const REDIRECT_NAV_ITEMS = [
+    { label: "Inbox", href: "/inbox", permKey: "inbox" as keyof Permissions },
+    { label: "Bookings", href: "/bookings", permKey: "bookings" as keyof Permissions },
+    { label: "Forms", href: "/forms", permKey: "forms" as keyof Permissions },
+    { label: "Inventory", href: "/inventory", permKey: "inventory" as keyof Permissions },
+];
+
 /* ── Constants ─────────────────────────────────────────── */
 
 const STAT_CONFIG = [
@@ -120,6 +127,32 @@ export default function DashboardPage() {
     const slug = params.workspaceSlug;
     const isOwner = profile?.role === "owner";
     const firstName = profile?.fullName?.split(" ")[0] ?? "there";
+    const router = useRouter();
+
+    /* ── Permission Guard ─────────────────────────────── */
+
+    useEffect(() => {
+        if (!profile) return;
+
+        // If staff and doesn't have reports permission, redirect to first allowed page
+        if (profile.role === "staff" && !hasPermission("reports")) {
+            const firstAllowed = REDIRECT_NAV_ITEMS.find(item =>
+                (item.permKey && hasPermission(item.permKey))
+            );
+
+            if (firstAllowed) {
+                router.push(`/${slug}${firstAllowed.href}`);
+            }
+        }
+    }, [profile, hasPermission, router, slug]);
+
+    if (profile?.role === "staff" && !hasPermission("reports")) {
+        return (
+            <div className="flex items-center justify-center py-32">
+                <Loader2 className="w-6 h-6 animate-spin text-slate-200" />
+            </div>
+        );
+    }
 
     const ACTION_ROUTES: Record<string, string> = {
         low_stock: `/${slug}/inventory`,
@@ -357,8 +390,8 @@ export default function DashboardPage() {
                         <div
                             key={stat.key}
                             className={`rounded-2xl p-5 transition-all duration-200 ${isFirst
-                                    ? "bg-slate-900 text-white shadow-lg shadow-slate-900/10"
-                                    : "bg-white border border-slate-200/80 hover:border-slate-300 hover:shadow-sm"
+                                ? "bg-slate-900 text-white shadow-lg shadow-slate-900/10"
+                                : "bg-white border border-slate-200/80 hover:border-slate-300 hover:shadow-sm"
                                 }`}
                         >
                             <div className="flex items-center justify-between mb-4">

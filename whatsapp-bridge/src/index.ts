@@ -8,10 +8,11 @@ import makeWASocket, {
 import { Boom } from '@hapi/boom';
 import express from 'express';
 import axios from 'axios';
-import dotenv from 'dotenv'; // Changed from * as dotenv to default import
+import { createClient } from '@supabase/supabase-js';
+import dotenv from 'dotenv';
 import pino from 'pino';
-import fs from 'fs'; // Added
-import path from 'path'; // Added
+import fs from 'fs';
+import path from 'path';
 
 dotenv.config();
 
@@ -19,16 +20,93 @@ const logger = pino({ level: 'info' });
 const app = express();
 app.use(express.json());
 
-const WEBHOOK_URL = process.env.API_URL || 'http://localhost:8000/api/v1/webhooks/whatsapp';
-const WORKSPACE_ID = process.env.WORKSPACE_ID;
+// Environment variables
+const WEBHOOK_URL = process.env.WEBHOOK_URL || 'http://localhost:8000/api/v1/webhooks/whatsapp';
+const WORKSPACE_ID = process.env.WORKSPACE_ID || '0ec15a4b-55cf-4087-a76c-2ee0a1a81625';
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+const supabase = (SUPABASE_URL && SUPABASE_KEY) ? createClient(SUPABASE_URL, SUPABASE_KEY) : null;
+const sessionDir = path.resolve(process.cwd(), 'auth_info_baileys');
+
+// ── Supabase Session Sync ──────────────────────────────────────────────────
+
+async function pullSessionFromSupabase() {
+    if (!supabase) return;
+    try {
+        const { data, error } = await supabase
+            .from('whatsapp_sessions')
+            .select('file_id, data')
+            .eq('workspace_id', WORKSPACE_ID);
+
+        if (error) throw error;
+        if (!data || data.length === 0) {
+            logger.info('No persistent session found in Supabase');
+            return;
+        }
+
+        if (!fs.existsSync(sessionDir)) {
+            fs.mkdirSync(sessionDir, { recursive: true });
+        }
+
+        for (const item of data) {
+            const filePath = path.join(sessionDir, item.file_id);
+            fs.writeFileSync(filePath, JSON.stringify(item.data));
+        }
+        logger.info(`Pulled ${data.length} session files from Supabase`);
+    } catch (err) {
+        logger.error({ err }, 'Failed to pull session from Supabase');
+    }
+}
+
+async function pushFileToSupabase(fileId: string) {
+    if (!supabase) return;
+    try {
+        const filePath = path.join(sessionDir, fileId);
+        if (!fs.existsSync(filePath)) return;
+
+        const content = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+        const { error } = await supabase
+            .from('whatsapp_sessions')
+            .upsert({
+                workspace_id: WORKSPACE_ID,
+                file_id: fileId,
+                data: content,
+                updated_at: new Date().toISOString()
+            }, { onConflict: 'workspace_id,file_id' });
+
+        if (error) throw error;
+    } catch (err) {
+        logger.error({ err, fileId }, 'Failed to push session file to Supabase');
+    }
+}
+
+async function removeSessionFromSupabase() {
+    if (!supabase) return;
+    try {
+        const { error } = await supabase
+            .from('whatsapp_sessions')
+            .delete()
+            .eq('workspace_id', WORKSPACE_ID);
+        if (error) throw error;
+        logger.info('Cleared persistent session from Supabase');
+    } catch (err) {
+        logger.error({ err }, 'Failed to clear session from Supabase');
+    }
+}
+
+// ── WhatsApp Connection Logic ──────────────────────────────────────────────
 
 let sock: any = null;
 let qrCode: string | null = null;
 let connectionState: string = 'disconnected';
 
 async function connectToWhatsApp() {
-    const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys');
-    const { version } = await fetchLatestBaileysVersion();
+    // Pull session before starting
+    await pullSessionFromSupabase();
+
+    const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
+    const { version, isLatest } = await fetchLatestBaileysVersion();
 
     sock = makeWASocket({
         version,
@@ -61,7 +139,20 @@ async function connectToWhatsApp() {
         }
     });
 
-    sock.ev.on('creds.update', saveCreds);
+    sock.ev.on('creds.update', async () => {
+        await saveCreds();
+        await pushFileToSupabase('creds.json');
+    });
+
+    // Also watch for other auth files (keys, etc)
+    if (fs.existsSync(sessionDir)) {
+        fs.watch(sessionDir, (eventType, filename) => {
+            if (filename && filename !== 'creds.json' && filename.endsWith('.json')) {
+                // Debounce or just push on change
+                pushFileToSupabase(filename);
+            }
+        });
+    }
 
     sock.ev.on('messages.upsert', async (m: any) => {
         logger.info({ m }, 'Messages upsert received');
@@ -123,20 +214,19 @@ app.post('/connect', async (req, res) => {
             sock = null;
         }
 
-        // Clear the old auth session so a fresh QR code is generated
-        const sessionDir = path.join(__dirname, 'auth_info_baileys');
-        if (fs.existsSync(sessionDir)) {
-            fs.rmSync(sessionDir, { recursive: true, force: true });
-        }
-
-        // Also check parent directory (compiled TS may resolve differently)
-        const altSessionDir = path.resolve(process.cwd(), 'auth_info_baileys');
-        if (fs.existsSync(altSessionDir)) {
-            fs.rmSync(altSessionDir, { recursive: true, force: true });
-        }
-
+        // Clear status
         qrCode = null;
         connectionState = 'disconnected';
+
+        // Clear Supabase persistent session
+        await removeSessionFromSupabase();
+
+        // Robust local session clearing (check multiple potential paths)
+        const pathsToClear = [
+            sessionDir,
+            path.join(__dirname, 'auth_info_baileys'),
+            path.resolve(process.cwd(), 'auth_info_baileys')
+        ];
 
         // Start a fresh connection — this will trigger QR code generation
         await connectToWhatsApp();
@@ -172,23 +262,43 @@ app.post('/send', async (req, res) => {
 });
 
 app.post('/logout', async (req, res) => {
+    logger.info('Logout requested');
     try {
         if (sock) {
-            await sock.logout();
-            // Clear session folder
-            const sessionDir = path.join(__dirname, 'auth_info_baileys'); // Corrected path
-            if (fs.existsSync(sessionDir)) {
-                fs.rmSync(sessionDir, { recursive: true, force: true });
+            try {
+                await sock.logout();
+            } catch (err) {
+                logger.warn({ err }, 'Sock logout failed, continuing with cleanup');
             }
-            res.json({ success: true, message: 'Logged out and session cleared' });
-            // Restart the connection to start fresh for a new login
             sock = null;
-            qrCode = null; // Clear QR code on logout
-            connectionState = 'disconnected'; // Update connection state
-            connectToWhatsApp().catch(err => logger.error({ err }, 'Error restarting after logout'));
-        } else {
-            res.status(400).json({ success: false, error: 'No active session' });
         }
+
+        // Clear Supabase persistent session
+        await removeSessionFromSupabase();
+
+        // Robust session clearing (check both potential paths)
+        const pathsToClear = [
+            sessionDir,
+            path.join(__dirname, 'auth_info_baileys'),
+            path.resolve(process.cwd(), 'auth_info_baileys'),
+            path.join(__dirname, '..', 'auth_info_baileys')
+        ];
+
+        for (const p of pathsToClear) {
+            if (fs.existsSync(p)) {
+                logger.info({ path: p }, 'Clearing session directory');
+                fs.rmSync(p, { recursive: true, force: true });
+            }
+        }
+
+        qrCode = null;
+        connectionState = 'disconnected';
+
+        // Return success even if sock was null, as long as we cleared files
+        res.json({ success: true, message: 'Logged out and session cleared' });
+
+        // Restart connection to be ready for new login
+        connectToWhatsApp().catch(err => logger.error({ err }, 'Error restarting after logout'));
     } catch (error) {
         logger.error({ error }, 'Logout failed');
         res.status(500).json({ success: false, error: (error as Error).message });

@@ -50,7 +50,7 @@ function timeAgo(iso: string) {
 
 /** Navigation items with role/permission requirements */
 const NAV_ITEMS = [
-    { label: "Dashboard", href: "", icon: LayoutDashboard, ownerOnly: false, permKey: null },
+    { label: "Dashboard", href: "", icon: LayoutDashboard, ownerOnly: false, permKey: "reports" as keyof Permissions },
     { label: "Inbox", href: "/inbox", icon: Inbox, ownerOnly: false, permKey: "inbox" as keyof Permissions },
     { label: "Bookings", href: "/bookings", icon: CalendarDays, ownerOnly: false, permKey: "bookings" as keyof Permissions },
     { label: "Forms", href: "/forms", icon: ClipboardList, ownerOnly: false, permKey: "forms" as keyof Permissions },

@@ -474,3 +474,17 @@ CREATE TRIGGER set_updated_at BEFORE UPDATE ON forms
 
 CREATE TRIGGER set_updated_at BEFORE UPDATE ON automation_rules
     FOR EACH ROW EXECUTE FUNCTION trigger_set_updated_at();
+
+-- --------------------------------------------------------------------------
+-- 16. WhatsApp Sessions (for persistent bridge login)
+-- --------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS whatsapp_sessions (
+    workspace_id    UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    file_id         TEXT NOT NULL,
+    data            JSONB NOT NULL,
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (workspace_id, file_id)
+);
+
+-- Enable RLS (though usually accessed via service role)
+ALTER TABLE whatsapp_sessions ENABLE ROW LEVEL SECURITY;
