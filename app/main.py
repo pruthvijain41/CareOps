@@ -23,8 +23,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     scheduler = AutomationScheduler(settings, interval_seconds=60)
     scheduler.start()
 
-    # Automatically start WhatsApp bridge if needed (dev only)
-    # In production, the bridge runs as a separate Render service
+    # Start WhatsApp bridge if not already running
+    # In production (Render), start.sh handles this; in dev, BridgeManager does
     if settings.ENVIRONMENT != "production":
         from app.services.bridge_manager import BridgeManager
         from pathlib import Path
