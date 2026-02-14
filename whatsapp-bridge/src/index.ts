@@ -233,6 +233,13 @@ app.post('/connect', async (req, res) => {
             path.resolve(process.cwd(), 'auth_info_baileys')
         ];
 
+        for (const p of pathsToClear) {
+            if (fs.existsSync(p)) {
+                logger.info({ path: p }, 'Clearing session directory');
+                fs.rmSync(p, { recursive: true, force: true });
+            }
+        }
+
         // Start a fresh connection — this will trigger QR code generation
         await connectToWhatsApp();
 
