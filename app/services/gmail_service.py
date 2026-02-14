@@ -9,6 +9,8 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import Any
 
+from google.oauth2.credentials import Credentials
+
 from app.core.config import Settings
 
 logger = logging.getLogger(__name__)
