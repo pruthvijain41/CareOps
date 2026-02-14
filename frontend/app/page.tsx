@@ -23,10 +23,15 @@ export default function LandingPage() {
     // Try up to 20 times (approx 1 minute)
     for (let i = 0; i < 20; i++) {
       try {
-        await healthCheck();
-        return true;
+        // Use healthCheck and verify with specific signature
+        const res = await healthCheck();
+        if (res && res.status === "healthy" && res.service === "careops") {
+          return true;
+        }
+        // If it's something else (e.g. Render spin-up page), wait
+        await new Promise(resolve => setTimeout(resolve, 3000));
       } catch (e) {
-        // Wait 3 seconds before next attempt
+        // Network error/timeout — backend is still booting
         await new Promise(resolve => setTimeout(resolve, 3000));
       }
     }

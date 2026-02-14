@@ -25,10 +25,19 @@ export default function LoginPage() {
         // Try up to 20 times (approx 1 minute)
         for (let i = 0; i < 20; i++) {
             try {
-                await healthCheck();
-                return true;
+                // Use a direct fetch/healthCheck but verify the response matches our API
+                // Adding a timestamp to bust any caches
+                const res = await healthCheck();
+
+                // Specifically check for our backend's signature
+                if (res && res.status === "healthy" && res.service === "careops") {
+                    return true;
+                }
+
+                // If we got a response but it's not ours (e.g. Render spin-up page), wait
+                await new Promise(resolve => setTimeout(resolve, 3000));
             } catch (e) {
-                // Wait 3 seconds before next attempt
+                // Network error or timeout — backend is still booting
                 await new Promise(resolve => setTimeout(resolve, 3000));
             }
         }

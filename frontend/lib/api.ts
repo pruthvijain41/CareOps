@@ -437,7 +437,8 @@ export async function disconnectIntegration(provider: string) {
 
 /** Health check */
 export async function healthCheck() {
-    const response = await api.get("/health");
+    // Add timestamp to bust any cache
+    const response = await api.get(`/health?t=${Date.now()}`);
     return response.data;
 }
 
