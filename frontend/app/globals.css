@@ -1,0 +1,185 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular;
+  --font-display: var(--font-outfit), var(--font-geist-sans), ui-sans-serif;
+
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+
+  --radius-sm: 0.125rem;
+  --radius-md: 0.25rem;
+  --radius-lg: 0.375rem;
+
+  /* Industrial Semantic Accents */
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-error: var(--error);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+:root {
+  /* Industrial Grayscale Palette - Light */
+  --background: oklch(0.99 0 0);
+  /* Near white */
+  --foreground: oklch(0.2 0.02 250);
+  /* Deep charcoal */
+
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.2 0.02 250);
+
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.2 0.02 250);
+
+  --primary: oklch(0.2 0.02 250);
+  --primary-foreground: oklch(0.98 0 0);
+
+  --secondary: oklch(0.95 0.01 250);
+  --secondary-foreground: oklch(0.2 0.02 250);
+
+  --muted: oklch(0.95 0.01 250);
+  --muted-foreground: oklch(0.5 0.02 250);
+
+  --accent: oklch(0.9 0.02 250);
+  --accent-foreground: oklch(0.2 0.02 250);
+
+  --destructive: oklch(0.6 0.18 20);
+  /* Rose-600 equivalent */
+  --destructive-foreground: oklch(0.98 0 0);
+
+  --border: oklch(0.85 0.02 250);
+  /* Defined 1px borders */
+  --input: oklch(0.9 0.02 250);
+  --ring: oklch(0.4 0.02 250);
+
+  /* Semantic Accents - Industrial */
+  --success: oklch(0.65 0.15 160);
+  /* Emerald-600 */
+  --warning: oklch(0.8 0.15 85);
+  /* Amber-500 */
+  --error: oklch(0.6 0.18 20);
+  /* Rose-600 */
+
+  --radius: 0.25rem;
+  /* Strict 4px radius */
+
+  --sidebar: oklch(0.97 0.01 250);
+  --sidebar-foreground: oklch(0.2 0.02 250);
+  --sidebar-primary: oklch(0.2 0.02 250);
+  --sidebar-primary-foreground: oklch(0.98 0 0);
+  --sidebar-accent: oklch(0.9 0.02 250);
+  --sidebar-accent-foreground: oklch(0.2 0.02 250);
+  --sidebar-border: oklch(0.85 0.02 250);
+  --sidebar-ring: oklch(0.4 0.02 250);
+}
+
+.dark {
+  /* Industrial Grayscale Palette - Dark */
+  --background: oklch(0.15 0.02 250);
+  --foreground: oklch(0.95 0.01 250);
+
+  --card: oklch(0.18 0.02 250);
+  --card-foreground: oklch(0.95 0.01 250);
+
+  --popover: oklch(0.18 0.02 250);
+  --popover-foreground: oklch(0.95 0.01 250);
+
+  --primary: oklch(0.95 0.01 250);
+  --primary-foreground: oklch(0.15 0.02 250);
+
+  --secondary: oklch(0.25 0.02 250);
+  --secondary-foreground: oklch(0.95 0.01 250);
+
+  --muted: oklch(0.25 0.02 250);
+  --muted-foreground: oklch(0.65 0.02 250);
+
+  --accent: oklch(0.3 0.02 250);
+  --accent-foreground: oklch(0.95 0.01 250);
+
+  --destructive: oklch(0.5 0.18 20);
+  --destructive-foreground: oklch(0.98 0 0);
+
+  --border: oklch(0.25 0.02 250);
+  --input: oklch(0.25 0.02 250);
+  --ring: oklch(0.7 0.01 250);
+
+  --sidebar: oklch(0.12 0.02 250);
+  --sidebar-foreground: oklch(0.95 0.01 250);
+  --sidebar-primary: oklch(0.95 0.01 250);
+  --sidebar-primary-foreground: oklch(0.12 0.02 250);
+  --sidebar-accent: oklch(0.25 0.02 250);
+  --sidebar-accent-foreground: oklch(0.95 0.01 250);
+  --sidebar-border: oklch(0.25 0.02 250);
+  --sidebar-ring: oklch(0.7 0.01 250);
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+    outline-color: color-mix(in srgb, var(--ring) 50%, transparent);
+    transition-duration: 0.15s;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    @apply font-sans antialiased;
+    letter-spacing: -0.01em;
+  }
+
+  /* Industrial Data Styles */
+  .data-field {
+    @apply font-mono text-sm tracking-tight;
+  }
+}
+
+@layer components {
+
+  /* Utilitarian Container Base */
+  .grid-container {
+    @apply border border-border divide-x divide-y divide-border;
+  }
+
+  .grid-item {
+    @apply p-4 bg-card hover:bg-accent/50 transition-colors;
+  }
+}
