@@ -128,13 +128,16 @@ async def gmail_connect(
     current_user: CurrentUser = None,  # type: ignore[assignment]
     settings: AppSettings = None,  # type: ignore[assignment]
     db: SupabaseClient = None,  # type: ignore[assignment]
+    source: str = Query("settings", description="Where the connect was initiated from: 'settings' or 'onboarding'"),
 ) -> dict[str, str]:
     workspace_id = _get_workspace_id(db, current_user["id"])
     flow = _build_flow(settings, "gmail")
+    # Encode source in state so callback knows where to redirect
+    combined_state = f"{workspace_id}|{source}"
     auth_url, state = flow.authorization_url(
         access_type="offline",
         prompt="consent",
-        state=workspace_id,
+        state=combined_state,
     )
     return {"authorization_url": auth_url, "state": state}
 
@@ -149,8 +152,11 @@ async def gmail_callback(
     state: str = Query(""),
     settings: AppSettings = None,  # type: ignore[assignment]
     db: SupabaseClient = None,  # type: ignore[assignment]
-) -> RedirectResponse:
-    workspace_id = state
+):
+    # Parse state: "workspace_id|source" or just "workspace_id"
+    parts = state.split("|", 1)
+    workspace_id = parts[0]
+    source = parts[1] if len(parts) > 1 else "settings"
     if not workspace_id:
         raise HTTPException(400, "Missing workspace_id in state")
 
@@ -214,7 +220,26 @@ async def gmail_callback(
         from fastapi.responses import HTMLResponse
         return HTMLResponse(content=error_html)
 
-    # Redirect back to workspace settings page
+    # If initiated from onboarding popup, show self-closing page
+    if source == "onboarding":
+        from fastapi.responses import HTMLResponse
+        success_html = """
+        <html><head><title>Gmail Connected</title></head>
+        <body style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:system-ui;background:#fafafa;">
+            <div style="text-align:center;max-width:400px;padding:40px;">
+                <div style="font-size:48px;margin-bottom:16px;">✅</div>
+                <h2 style="color:#0f172a;margin-bottom:8px;">Gmail Connected!</h2>
+                <p style="color:#64748b;font-size:14px;margin-bottom:24px;">
+                    You can close this tab — onboarding will continue automatically.
+                </p>
+                <p style="color:#94a3b8;font-size:12px;">This tab will close automatically...</p>
+            </div>
+            <script>setTimeout(function(){ window.close(); }, 2000);</script>
+        </body></html>
+        """
+        return HTMLResponse(content=success_html)
+
+    # Otherwise redirect back to workspace settings page
     try:
         ws = db.table("workspaces").select("slug").eq("id", workspace_id).single().execute()
         slug = ws.data["slug"] if ws.data else ""
@@ -235,13 +260,15 @@ async def gcal_connect(
     current_user: CurrentUser = None,  # type: ignore[assignment]
     settings: AppSettings = None,  # type: ignore[assignment]
     db: SupabaseClient = None,  # type: ignore[assignment]
+    source: str = Query("settings", description="Where the connect was initiated from: 'settings' or 'onboarding'"),
 ) -> dict[str, str]:
     workspace_id = _get_workspace_id(db, current_user["id"])
     flow = _build_flow(settings, "gcal")
+    combined_state = f"{workspace_id}|{source}"
     auth_url, state = flow.authorization_url(
         access_type="offline",
         prompt="consent",
-        state=workspace_id,
+        state=combined_state,
     )
     return {"authorization_url": auth_url, "state": state}
 
@@ -255,8 +282,11 @@ async def gcal_callback(
     state: str = Query(""),
     settings: AppSettings = None,  # type: ignore[assignment]
     db: SupabaseClient = None,  # type: ignore[assignment]
-) -> RedirectResponse:
-    workspace_id = state
+):
+    # Parse state: "workspace_id|source" or just "workspace_id"
+    parts = state.split("|", 1)
+    workspace_id = parts[0]
+    source = parts[1] if len(parts) > 1 else "settings"
     if not workspace_id:
         raise HTTPException(400, "Missing workspace_id in state")
 
@@ -303,6 +333,25 @@ async def gcal_callback(
         return RedirectResponse(
             url=f"{settings.FRONTEND_URL}/settings?error=gcal_failed&detail={str(exc)[:100]}",
         )
+
+    # If initiated from onboarding popup, show self-closing page
+    if source == "onboarding":
+        from fastapi.responses import HTMLResponse
+        success_html = """
+        <html><head><title>Calendar Connected</title></head>
+        <body style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:system-ui;background:#fafafa;">
+            <div style="text-align:center;max-width:400px;padding:40px;">
+                <div style="font-size:48px;margin-bottom:16px;">✅</div>
+                <h2 style="color:#0f172a;margin-bottom:8px;">Calendar Connected!</h2>
+                <p style="color:#64748b;font-size:14px;margin-bottom:24px;">
+                    You can close this tab — onboarding will continue automatically.
+                </p>
+                <p style="color:#94a3b8;font-size:12px;">This tab will close automatically...</p>
+            </div>
+            <script>setTimeout(function(){ window.close(); }, 2000);</script>
+        </body></html>
+        """
+        return HTMLResponse(content=success_html)
 
     try:
         ws = db.table("workspaces").select("slug").eq("id", workspace_id).single().execute()

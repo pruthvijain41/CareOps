@@ -508,7 +508,7 @@ export default function OnboardingPage() {
                 await provisionWorkspace(collected);
             }
 
-            const data = await getGmailConnectUrl();
+            const data = await getGmailConnectUrl("onboarding");
             const authUrl = data.authorization_url || data.auth_url;
             if (authUrl && gmailWindow) {
                 gmailWindow.location.href = authUrl;

@@ -418,14 +418,14 @@ export async function getIntegrationStatus() {
 }
 
 /** Get Gmail OAuth connect URL */
-export async function getGmailConnectUrl() {
-    const response = await api.get("/api/v1/auth/gmail/connect");
+export async function getGmailConnectUrl(source: string = "settings") {
+    const response = await api.get(`/api/v1/auth/gmail/connect?source=${source}`);
     return response.data;
 }
 
 /** Get Google Calendar OAuth connect URL */
-export async function getGcalConnectUrl() {
-    const response = await api.get("/api/v1/auth/gcal/connect");
+export async function getGcalConnectUrl(source: string = "settings") {
+    const response = await api.get(`/api/v1/auth/gcal/connect?source=${source}`);
     return response.data;
 }
 
