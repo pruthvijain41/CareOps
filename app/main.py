@@ -50,6 +50,15 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
+    # -- Logging Middleware --
+    from fastapi import Request
+    @app.middleware("http")
+    async def log_requests(request: Request, call_next):
+        logger.info(f"Incoming request: {request.method} {request.url.path}")
+        response = await call_next(request)
+        logger.info(f"Response status: {response.status_code}")
+        return response
+
     # -- CORS --
     app.add_middleware(
         CORSMiddleware,
