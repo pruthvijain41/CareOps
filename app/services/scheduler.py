@@ -23,6 +23,7 @@ class AutomationScheduler:
         self.settings = settings
         self.interval_seconds = interval_seconds
         self._task: asyncio.Task | None = None
+        self._db: Any = None  # Lazy-initialized Supabase client (reused across ticks)
 
     def start(self) -> None:
         """Start the scheduler background loop."""
@@ -58,9 +59,11 @@ class AutomationScheduler:
 
     async def _tick(self) -> None:
         """Single scheduler tick — check for pending timed events."""
-        from supabase import create_client
+        if self._db is None:
+            from supabase import create_client
+            self._db = create_client(self.settings.SUPABASE_URL, self.settings.SUPABASE_SERVICE_ROLE_KEY)
 
-        db = create_client(self.settings.SUPABASE_URL, self.settings.SUPABASE_SERVICE_ROLE_KEY)
+        db = self._db
 
         await self._check_booking_reminders(db)
         await self._check_pending_form_reminders(db)

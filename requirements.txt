@@ -26,8 +26,3 @@ google-auth-oauthlib>=1.2.0
 
 # -- Validation --
 email-validator>=2.2.0
-
-# -- Dev/Testing --
-pytest>=8.3.0
-pytest-asyncio>=0.24.0
-ruff>=0.8.0

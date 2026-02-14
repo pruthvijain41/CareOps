@@ -21,7 +21,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # Start the automation scheduler (booking reminders, form reminders)
     from app.services.scheduler import AutomationScheduler
-    scheduler = AutomationScheduler(settings, interval_seconds=60)
+    scheduler = AutomationScheduler(settings, interval_seconds=300)
     scheduler.start()
 
     # Start WhatsApp bridge if not already running

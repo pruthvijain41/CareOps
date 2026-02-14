@@ -9,9 +9,6 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import Any
 
-from google.oauth2.credentials import Credentials
-from googleapiclient.discovery import build
-
 from app.core.config import Settings
 
 logger = logging.getLogger(__name__)
@@ -44,6 +41,7 @@ class GmailService:
                 return None
 
             creds_data = result.data["credentials"]
+            from google.oauth2.credentials import Credentials
             creds = Credentials(
                 token=creds_data.get("token"),
                 refresh_token=creds_data.get("refresh_token"),
@@ -62,6 +60,7 @@ class GmailService:
         creds = self._get_credentials(workspace_id)
         if not creds:
             return None
+        from googleapiclient.discovery import build
         return build("gmail", "v1", credentials=creds)
 
     async def is_connected(self, workspace_id: str) -> bool:

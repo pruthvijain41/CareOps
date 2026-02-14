@@ -9,8 +9,6 @@ from typing import Any
 import requests as http_requests
 from fastapi import APIRouter, HTTPException, Query, status
 from fastapi.responses import RedirectResponse
-from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import Flow
 
 from app.core.config import Settings
 from app.core.dependencies import AppSettings, CurrentUser, SupabaseClient
@@ -49,8 +47,10 @@ def _get_workspace_id(db: Any, user_id: str) -> str:
     return result.data["workspace_id"]
 
 
-def _build_flow(settings: Any, provider: str) -> Flow:
+def _build_flow(settings: Any, provider: str) -> "Flow":
     """Build a Google OAuth Flow for the given provider."""
+    from google_auth_oauthlib.flow import Flow
+
     if provider == "gmail":
         client_id = settings.GMAIL_CLIENT_ID
         client_secret = settings.GMAIL_CLIENT_SECRET
@@ -157,6 +157,7 @@ async def gmail_callback(
     try:
         # Exchange code for tokens manually (avoids scope-mismatch errors)
         token_data = _exchange_code(settings, "gmail", code)
+        from google.oauth2.credentials import Credentials
         creds = Credentials(
             token=token_data["access_token"],
             refresh_token=token_data.get("refresh_token"),
@@ -271,6 +272,7 @@ async def gcal_callback(
     try:
         # Exchange code for tokens manually (avoids scope-mismatch errors)
         token_data = _exchange_code(settings, "gcal", code)
+        from google.oauth2.credentials import Credentials
         creds = Credentials(
             token=token_data["access_token"],
             refresh_token=token_data.get("refresh_token"),
