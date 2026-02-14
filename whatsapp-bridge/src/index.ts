@@ -21,8 +21,8 @@ const app = express();
 app.use(express.json());
 
 // Environment variables
-const WEBHOOK_URL = process.env.WEBHOOK_URL || 'http://localhost:8000/api/v1/webhooks/whatsapp';
-const WORKSPACE_ID = process.env.WORKSPACE_ID || '0ec15a4b-55cf-4087-a76c-2ee0a1a81625';
+const WEBHOOK_URL = process.env.WEBHOOK_URL || 'http://localhost:10000/api/v1/webhooks/whatsapp';
+const WORKSPACE_ID = process.env.WORKSPACE_ID || ''; // Required in production
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
