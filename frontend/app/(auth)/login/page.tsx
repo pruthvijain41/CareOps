@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { WakeupNotice } from "@/components/auth/wakeup-notice";
+import { healthCheck } from "@/lib/api";
 
 export default function LoginPage() {
     const router = useRouter();
@@ -19,6 +20,20 @@ export default function LoginPage() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<string | null>(null);
+
+    async function ensureBackendAwake() {
+        // Try up to 20 times (approx 1 minute)
+        for (let i = 0; i < 20; i++) {
+            try {
+                await healthCheck();
+                return true;
+            } catch (e) {
+                // Wait 3 seconds before next attempt
+                await new Promise(resolve => setTimeout(resolve, 3000));
+            }
+        }
+        return false;
+    }
 
     async function handleLogin(e: React.FormEvent) {
         e.preventDefault();
@@ -33,6 +48,9 @@ export default function LoginPage() {
             });
 
             if (authError) throw authError;
+
+            // Wait for backend to wake up before profile fetches
+            await ensureBackendAwake();
 
             // Fetch profile with workspace details
             const { data: { user } } = await supabase.auth.getUser();
@@ -115,6 +133,9 @@ export default function LoginPage() {
             });
 
             if (authError) throw authError;
+
+            // Wait for backend to wake up
+            await ensureBackendAwake();
 
             if (data.user) {
                 // Auto-login after signup
