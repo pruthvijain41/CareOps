@@ -471,12 +471,14 @@ async def whatsapp_webhook(
     text = payload.text
     message_id = payload.message_id
 
-    logger.info("📱 WhatsApp — chat_id=%s, from=%s, text=%s", chat_id, from_name, text[:100])
+    logger.info("📱 WhatsApp — workspace_id=%s, chat_id=%s, from=%s, text=%s", workspace_id, chat_id, from_name, text[:100])
 
     # Find or create contact (WhatsApp chat_id is the phone number)
     # Baileys chat_id usually looks like '1234567890@s.whatsapp.net'
     phone_raw = chat_id.split("@")[0]
     phone_clean = WhatsAppService.normalize_phone(phone_raw)
+    
+    logger.info("📱 WhatsApp — phone_raw=%s, phone_clean=%s", phone_raw, phone_clean)
     
     contact = _find_or_create_contact(
         db=db,
@@ -485,15 +487,23 @@ async def whatsapp_webhook(
         full_name=from_name,
     )
 
+    logger.info("📱 WhatsApp — contact_id=%s, contact_name=%s", contact["id"], contact.get("full_name"))
+
     # Upsert conversation (keyed by WhatsApp chat_id)
+    ext_thread = f"wa_{phone_clean}"
+    logger.info("📱 WhatsApp — looking for conversation with external_thread_id=%s, channel=whatsapp", ext_thread)
+    
     conversation = _upsert_conversation(
         db=db,
         workspace_id=workspace_id,
         contact_id=contact["id"],
         channel="whatsapp",
-        external_thread_id=f"wa_{phone_clean}",
+        external_thread_id=ext_thread,
         subject=f"WhatsApp chat with {from_name}",
     )
+
+    logger.info("📱 WhatsApp — matched/created conversation_id=%s, conv_channel=%s, conv_ext_thread=%s", 
+                conversation["id"], conversation.get("channel"), conversation.get("external_thread_id"))
 
     # Insert message
     _insert_message(
