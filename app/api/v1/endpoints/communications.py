@@ -131,14 +131,13 @@ def _upsert_conversation(
             ).eq("id", result.data[0]["id"]).execute()
             return result.data[0]
 
-    # Fallback: Find by contact_id — match any channel to avoid duplicates
-    # This prevents separate threads when e.g. a booking creates "whatsapp"
-    # and a contact form creates "internal" for the same person.
+    # Fallback: Find by contact_id + same channel to reuse existing thread
     result = (
         db.table("conversations")
         .select("*")
         .eq("workspace_id", workspace_id)
         .eq("contact_id", contact_id)
+        .eq("channel", channel)
         .order("last_message_at", desc=True)
         .limit(1)
         .execute()
@@ -146,15 +145,33 @@ def _upsert_conversation(
     if result.data:
         conv_found = result.data[0]
         updates = {"last_message_at": datetime.now(timezone.utc).isoformat()}
-
-        # Upgrade channel/thread_id if the new data is more specific
-        if channel != "internal" and conv_found.get("channel") == "internal":
-            updates["channel"] = channel
         if external_thread_id and not conv_found.get("external_thread_id"):
             updates["external_thread_id"] = external_thread_id
-
         db.table("conversations").update(updates).eq("id", conv_found["id"]).execute()
         return {**conv_found, **updates}
+
+    # Fallback: upgrade an "internal" conversation to a real channel
+    if channel != "internal":
+        result = (
+            db.table("conversations")
+            .select("*")
+            .eq("workspace_id", workspace_id)
+            .eq("contact_id", contact_id)
+            .eq("channel", "internal")
+            .order("last_message_at", desc=True)
+            .limit(1)
+            .execute()
+        )
+        if result.data:
+            conv_found = result.data[0]
+            updates = {
+                "last_message_at": datetime.now(timezone.utc).isoformat(),
+                "channel": channel,
+            }
+            if external_thread_id:
+                updates["external_thread_id"] = external_thread_id
+            db.table("conversations").update(updates).eq("id", conv_found["id"]).execute()
+            return {**conv_found, **updates}
 
     # Create new conversation
     new_conv = {
