@@ -18,10 +18,6 @@ cd ..
 echo "📱 Scheduling WhatsApp bridge start (15s delay)..."
 (sleep 15 && cd whatsapp-bridge && \
   WHATSAPP_BRIDGE_PORT=3001 \
-  WEBHOOK_URL="${WEBHOOK_URL:-http://localhost:10000/api/v1/webhooks/whatsapp}" \
-  WORKSPACE_ID="${WORKSPACE_ID}" \
-  SUPABASE_URL="${SUPABASE_URL}" \
-  SUPABASE_SERVICE_ROLE_KEY="${SUPABASE_SERVICE_ROLE_KEY}" \
   node dist/index.js) &
 BRIDGE_PID=$!
 echo "📱 WhatsApp bridge scheduled (PID: $BRIDGE_PID)"
