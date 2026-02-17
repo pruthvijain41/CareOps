@@ -478,9 +478,33 @@ async def whatsapp_webhook(
     # Baileys chat_id usually looks like '1234567890@s.whatsapp.net'
     phone_raw = chat_id.split("@")[0]
     phone_clean = WhatsAppService.normalize_phone(phone_raw)
+    ext_thread = f"wa_{phone_clean}"
     
-    print(f"📱 WA-WEBHOOK phone_raw={phone_raw}, phone_clean={phone_clean}", flush=True)
-    
+    print(f"📱 WA-WEBHOOK phone_raw={phone_raw}, phone_clean={phone_clean}, ext_thread={ext_thread}", flush=True)
+
+    # ── KEY FIX: Look for an existing conversation by external_thread_id ──
+    # The bridge may send a different workspace_id than where the booking was created.
+    # Find the most recent conversation for this phone in ANY workspace first.
+    existing_conv = (
+        db.table("conversations")
+        .select("*")
+        .eq("external_thread_id", ext_thread)
+        .eq("channel", "whatsapp")
+        .order("last_message_at", desc=True)
+        .limit(1)
+        .execute()
+    )
+
+    if existing_conv.data:
+        # Use the workspace_id from the existing conversation
+        effective_workspace_id = existing_conv.data[0]["workspace_id"]
+        print(f"📱 WA-WEBHOOK FOUND existing conv in workspace={effective_workspace_id} (bridge sent={workspace_id})", flush=True)
+        if effective_workspace_id != workspace_id:
+            print(f"⚠️  WA-WEBHOOK WORKSPACE MISMATCH: bridge={workspace_id}, existing={effective_workspace_id}. Using existing.", flush=True)
+        workspace_id = effective_workspace_id
+    else:
+        print(f"📱 WA-WEBHOOK No existing conv for {ext_thread}, using bridge workspace_id={workspace_id}", flush=True)
+
     contact = _find_or_create_contact(
         db=db,
         workspace_id=workspace_id,
@@ -490,13 +514,7 @@ async def whatsapp_webhook(
 
     print(f"📱 WA-WEBHOOK contact_id={contact['id']}, contact_name={contact.get('full_name')}", flush=True)
 
-    # Upsert conversation (keyed by WhatsApp chat_id)
-    ext_thread = f"wa_{phone_clean}"
-    
-    # DEBUG: Check what conversations exist for this phone in ANY workspace
-    debug_convs = db.table("conversations").select("id, workspace_id, channel, external_thread_id").eq("external_thread_id", ext_thread).execute()
-    print(f"📱 WA-WEBHOOK DEBUG existing convs for {ext_thread}: {debug_convs.data}", flush=True)
-    
+    # Upsert conversation (now using the correct workspace_id)
     conversation = _upsert_conversation(
         db=db,
         workspace_id=workspace_id,
@@ -506,7 +524,7 @@ async def whatsapp_webhook(
         subject=f"WhatsApp chat with {from_name}",
     )
 
-    print(f"📱 WA-WEBHOOK matched/created conv_id={conversation['id']}, conv_workspace={conversation.get('workspace_id')}, conv_channel={conversation.get('channel')}, conv_ext_thread={conversation.get('external_thread_id')}", flush=True)
+    print(f"📱 WA-WEBHOOK matched/created conv_id={conversation['id']}, conv_workspace={conversation.get('workspace_id')}", flush=True)
 
     # Insert message
     _insert_message(
