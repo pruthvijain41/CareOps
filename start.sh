@@ -16,7 +16,13 @@ cd ..
 
 # ── Start WhatsApp Bridge with a delay (so FastAPI binds port 10000 first) ───
 echo "📱 Scheduling WhatsApp bridge start (5s delay)..."
-(sleep 5 && cd whatsapp-bridge && WHATSAPP_BRIDGE_PORT=3001 node dist/index.js) &
+(sleep 5 && cd whatsapp-bridge && \
+  WHATSAPP_BRIDGE_PORT=3001 \
+  WEBHOOK_URL="${WEBHOOK_URL:-http://localhost:10000/api/v1/webhooks/whatsapp}" \
+  WORKSPACE_ID="${WORKSPACE_ID}" \
+  SUPABASE_URL="${SUPABASE_URL}" \
+  SUPABASE_SERVICE_ROLE_KEY="${SUPABASE_SERVICE_ROLE_KEY}" \
+  node dist/index.js) &
 BRIDGE_PID=$!
 echo "📱 WhatsApp bridge scheduled (PID: $BRIDGE_PID)"
 
