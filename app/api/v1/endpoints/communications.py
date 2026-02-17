@@ -464,21 +464,22 @@ async def whatsapp_webhook(
     2. Upsert conversation keyed by chat_id
     3. Insert the message into the DB
     """
-    logger.info("🔗 Received WhatsApp Webhook: %s", payload.model_dump())
+    import sys
+    print(f"🔗 WA-WEBHOOK RECEIVED: {payload.model_dump()}", flush=True)
     workspace_id = str(payload.workspace_id)
     chat_id = payload.chat_id
     from_name = payload.from_name
     text = payload.text
     message_id = payload.message_id
 
-    logger.info("📱 WhatsApp — workspace_id=%s, chat_id=%s, from=%s, text=%s", workspace_id, chat_id, from_name, text[:100])
+    print(f"📱 WA-WEBHOOK workspace_id={workspace_id}, chat_id={chat_id}, from={from_name}, text={text[:100]}", flush=True)
 
     # Find or create contact (WhatsApp chat_id is the phone number)
     # Baileys chat_id usually looks like '1234567890@s.whatsapp.net'
     phone_raw = chat_id.split("@")[0]
     phone_clean = WhatsAppService.normalize_phone(phone_raw)
     
-    logger.info("📱 WhatsApp — phone_raw=%s, phone_clean=%s", phone_raw, phone_clean)
+    print(f"📱 WA-WEBHOOK phone_raw={phone_raw}, phone_clean={phone_clean}", flush=True)
     
     contact = _find_or_create_contact(
         db=db,
@@ -487,11 +488,14 @@ async def whatsapp_webhook(
         full_name=from_name,
     )
 
-    logger.info("📱 WhatsApp — contact_id=%s, contact_name=%s", contact["id"], contact.get("full_name"))
+    print(f"📱 WA-WEBHOOK contact_id={contact['id']}, contact_name={contact.get('full_name')}", flush=True)
 
     # Upsert conversation (keyed by WhatsApp chat_id)
     ext_thread = f"wa_{phone_clean}"
-    logger.info("📱 WhatsApp — looking for conversation with external_thread_id=%s, channel=whatsapp", ext_thread)
+    
+    # DEBUG: Check what conversations exist for this phone in ANY workspace
+    debug_convs = db.table("conversations").select("id, workspace_id, channel, external_thread_id").eq("external_thread_id", ext_thread).execute()
+    print(f"📱 WA-WEBHOOK DEBUG existing convs for {ext_thread}: {debug_convs.data}", flush=True)
     
     conversation = _upsert_conversation(
         db=db,
@@ -502,8 +506,7 @@ async def whatsapp_webhook(
         subject=f"WhatsApp chat with {from_name}",
     )
 
-    logger.info("📱 WhatsApp — matched/created conversation_id=%s, conv_channel=%s, conv_ext_thread=%s", 
-                conversation["id"], conversation.get("channel"), conversation.get("external_thread_id"))
+    print(f"📱 WA-WEBHOOK matched/created conv_id={conversation['id']}, conv_workspace={conversation.get('workspace_id')}, conv_channel={conversation.get('channel')}, conv_ext_thread={conversation.get('external_thread_id')}", flush=True)
 
     # Insert message
     _insert_message(
@@ -517,11 +520,7 @@ async def whatsapp_webhook(
         external_id=f"wa_msg_{message_id}" if message_id else None,
     )
 
-    logger.info(
-        "✅ WhatsApp webhook completed — contact=%s, conversation=%s",
-        contact["id"],
-        conversation["id"],
-    )
+    print(f"✅ WA-WEBHOOK DONE contact={contact['id']}, conversation={conversation['id']}", flush=True)
 
     return {
         "status": "processed",
