@@ -513,66 +513,79 @@ async def create_public_booking(
     except Exception:
         pass
 
-    # ── Send WhatsApp confirmation ──
+    # ── Send WhatsApp confirmation (async with retry for connection instability) ──
     logger.info("📱 Attempting WhatsApp confirmation for %s", phone_clean)
     if phone_clean:
         try:
             from app.core.config import get_settings
             from app.services.whatsapp_service import WhatsAppService
-            wa = WhatsAppService(get_settings())
-            
-            # Check status before sending
-            status_wa = await wa.get_status()
-            logger.info("📱 WhatsApp connection status: %s", status_wa.get("state"))
-            if status_wa.get("state") == "connected":
-                service_name = "our services"
-                if data.service_id:
-                    svc_res = db.table("services").select("name").eq("id", data.service_id).single().execute()
-                    if svc_res.data:
-                        service_name = svc_res.data["name"]
+            import asyncio
 
-                booking_time = data.starts_at.strftime("%I:%M %p")
-                booking_date = data.starts_at.strftime("%a, %b %d")
-                
-                wa_body = (
-                    f"Hi {data.name}, your booking for *{service_name}* is confirmed!\n\n"
-                    f"📅 *Date:* {booking_date}\n"
-                    f"⏰ *Time:* {booking_time}\n"
-                    f"📍 *Where:* {workspace_slug.capitalize()}\n\n"
-                    f"We look forward to seeing you!"
-                )
-                
-                import asyncio
-                asyncio.create_task(wa.send_message(chat_id=phone_clean, text=wa_body))
-                logger.info("📱 Booking WhatsApp confirmation queued for %s", phone_clean)
+            service_name = "our services"
+            if data.service_id:
+                svc_res = db.table("services").select("name").eq("id", data.service_id).single().execute()
+                if svc_res.data:
+                    service_name = svc_res.data["name"]
 
-                # Record the outgoing message in inbox so the full thread is visible
-                try:
-                    from app.api.v1.endpoints.communications import _upsert_conversation, _insert_message
-                    conversation = _upsert_conversation(
-                        db=db,
-                        workspace_id=workspace_id,
-                        contact_id=contact_id,
-                        channel="whatsapp",
-                        external_thread_id=f"wa_{phone_clean}",
-                        subject=f"Booking confirmation — {data.name}",
-                    )
-                    _insert_message(
-                        db=db,
-                        conversation_id=conversation["id"],
-                        workspace_id=workspace_id,
-                        body=wa_body,
-                        source="whatsapp",
-                        sender_type="staff",
-                        sender_id=None,
-                    )
-                    logger.info("📥 Outgoing booking confirmation recorded in inbox")
-                except Exception as msg_exc:
-                    logger.warning("Failed to record outgoing message in inbox: %s", msg_exc)
-            else:
-                logger.warning("📱 WhatsApp NOT sent: status is %s", status_wa.get("state"))
+            booking_time = data.starts_at.strftime("%I:%M %p")
+            booking_date = data.starts_at.strftime("%a, %b %d")
+
+            wa_body = (
+                f"Hi {data.name}, your booking for *{service_name}* is confirmed!\n\n"
+                f"📅 *Date:* {booking_date}\n"
+                f"⏰ *Time:* {booking_time}\n"
+                f"📍 *Where:* {workspace_slug.capitalize()}\n\n"
+                f"We look forward to seeing you!"
+            )
+
+            async def _send_wa_with_retry():
+                """Retry WhatsApp send up to 3 times, waiting for connection to stabilize."""
+                wa = WhatsAppService(get_settings())
+                max_attempts = 3
+                for attempt in range(1, max_attempts + 1):
+                    try:
+                        status_wa = await wa.get_status()
+                        logger.info("📱 WhatsApp status check %d/%d: %s", attempt, max_attempts, status_wa.get("state"))
+                        if status_wa.get("state") == "connected":
+                            await wa.send_message(chat_id=phone_clean, text=wa_body)
+                            logger.info("📱 Booking WhatsApp confirmation sent to %s", phone_clean)
+
+                            # Record outgoing message in inbox
+                            try:
+                                from app.api.v1.endpoints.communications import _upsert_conversation, _insert_message
+                                conversation = _upsert_conversation(
+                                    db=db,
+                                    workspace_id=workspace_id,
+                                    contact_id=contact_id,
+                                    channel="whatsapp",
+                                    external_thread_id=f"wa_{phone_clean}",
+                                    subject=f"Booking confirmation — {data.name}",
+                                )
+                                _insert_message(
+                                    db=db,
+                                    conversation_id=conversation["id"],
+                                    workspace_id=workspace_id,
+                                    body=wa_body,
+                                    source="whatsapp",
+                                    sender_type="staff",
+                                    sender_id=None,
+                                )
+                                logger.info("📥 Outgoing WhatsApp confirmation recorded in inbox")
+                            except Exception as msg_exc:
+                                logger.warning("Failed to record outgoing message in inbox: %s", msg_exc)
+                            return  # Success — done
+                    except Exception as exc:
+                        logger.warning("📱 WhatsApp send attempt %d failed: %s", attempt, exc)
+
+                    # Wait before retrying (connection may be reconnecting after deploy)
+                    if attempt < max_attempts:
+                        await asyncio.sleep(5)
+
+                logger.warning("📱 WhatsApp NOT sent after %d attempts — connection never stabilized", max_attempts)
+
+            asyncio.create_task(_send_wa_with_retry())
         except Exception as exc:
-            logger.warning("📱 Failed to send booking WhatsApp (non-blocking): %s", exc)
+            logger.warning("📱 Failed to queue booking WhatsApp (non-blocking): %s", exc)
     else:
         logger.warning("📱 WhatsApp NOT sent: phone_clean is empty")
 

@@ -14,9 +14,9 @@ cd whatsapp-bridge
 npm run build
 cd ..
 
-# ── Start WhatsApp Bridge with a delay (so FastAPI binds port 10000 first) ───
-echo "📱 Scheduling WhatsApp bridge start (5s delay)..."
-(sleep 5 && cd whatsapp-bridge && \
+# ── Start WhatsApp Bridge with a delay (so FastAPI binds first and old instance shuts down) ──
+echo "📱 Scheduling WhatsApp bridge start (15s delay)..."
+(sleep 15 && cd whatsapp-bridge && \
   WHATSAPP_BRIDGE_PORT=3001 \
   WEBHOOK_URL="${WEBHOOK_URL:-http://localhost:10000/api/v1/webhooks/whatsapp}" \
   WORKSPACE_ID="${WORKSPACE_ID}" \
