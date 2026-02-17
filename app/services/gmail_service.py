@@ -130,8 +130,8 @@ class GmailService:
                 .execute()
             )
 
-            logger.info("📧 Email sent to %s — Message ID: %s", to, result.get("id"))
-            return {"status": "sent", "message_id": result.get("id"), "to": to}
+            logger.info("📧 Email sent to %s — Message ID: %s, Thread ID: %s", to, result.get("id"), result.get("threadId"))
+            return {"status": "sent", "message_id": result.get("id"), "thread_id": result.get("threadId"), "to": to}
 
         except Exception as exc:
             logger.error("📧 Failed to send email to %s: %s", to, exc)

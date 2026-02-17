@@ -238,6 +238,50 @@ class AutomationEngine:
                 subject=subject,
                 body_html=html_body,
             )
+
+            # Record the outgoing email in inbox so it appears as a conversation
+            if result.get("status") == "sent":
+                try:
+                    from app.api.v1.endpoints.communications import (
+                        _find_or_create_contact,
+                        _upsert_conversation,
+                        _insert_message,
+                    )
+                    contact_name = payload.get("contact_name", to_email.split("@")[0])
+
+                    contact = _find_or_create_contact(
+                        db=self.db,
+                        workspace_id=workspace_id,
+                        email=to_email,
+                        full_name=contact_name,
+                    )
+
+                    # Use Gmail threadId as thread key so replies link here
+                    gmail_thread_id = result.get("thread_id", "")
+                    gmail_msg_id = result.get("message_id", "")
+                    conversation = _upsert_conversation(
+                        db=self.db,
+                        workspace_id=workspace_id,
+                        contact_id=contact["id"],
+                        channel="gmail",
+                        external_thread_id=f"gmail_{gmail_thread_id}" if gmail_thread_id else None,
+                        subject=subject,
+                    )
+
+                    _insert_message(
+                        db=self.db,
+                        conversation_id=conversation["id"],
+                        workspace_id=workspace_id,
+                        body=body,
+                        source="gmail",
+                        sender_type="staff",
+                        sender_id=None,
+                        external_id=f"gmail_msg_{gmail_msg_id}" if gmail_msg_id else None,
+                    )
+                    logger.info("📥 Outgoing automation email recorded in inbox for %s", to_email)
+                except Exception as rec_exc:
+                    logger.warning("Failed to record outgoing email in inbox: %s", rec_exc)
+
             return result
 
         except Exception as exc:
