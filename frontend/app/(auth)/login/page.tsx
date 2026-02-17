@@ -184,7 +184,7 @@ export default function LoginPage() {
                                 fullName: fullName || email.split("@")[0],
                                 avatarUrl: null,
                                 email: loggedInUser.email ?? null,
-                                permissions: { inbox: true, bookings: true, forms: true, inventory: true, reports: true },
+                                permissions: { inbox: true, leads: true, bookings: true, forms: true, inventory: true, reports: true },
                             });
                             router.push(isOnboarded ? `/${workspace.slug}` : "/onboarding");
                             return;

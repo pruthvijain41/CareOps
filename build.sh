@@ -6,6 +6,10 @@
 
 set -e
 
+echo "📦 Setting up virtual environment..."
+python3.12 -m venv venv
+source venv/bin/activate
+
 echo "📦 Installing Python dependencies..."
 pip install -r requirements.txt
 

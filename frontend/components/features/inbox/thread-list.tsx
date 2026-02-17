@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
-import { listConversations } from "@/lib/api";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { listConversations, syncGmail } from "@/lib/api";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
-import { Search, Mail, MessageCircle, Inbox, MessageSquare } from "lucide-react";
+import { Search, Mail, MessageCircle, Inbox, MessageSquare, RefreshCw } from "lucide-react";
 
 interface Conversation {
     id: string;
@@ -28,12 +28,33 @@ export function ThreadList({ onSelect, activeId }: ThreadListProps) {
     const params = useParams<{ workspaceSlug: string }>();
     const [activeFilter, setActiveFilter] = useState<string>("All");
     const [searchQuery, setSearchQuery] = useState("");
+    const [isSyncing, setIsSyncing] = useState(false);
+    const queryClient = useQueryClient();
 
     const { data: threads, isLoading } = useQuery<Conversation[]>({
         queryKey: ["conversations", params.workspaceSlug],
         queryFn: listConversations,
-        refetchInterval: 30000,
+        refetchInterval: 15000,
     });
+
+    // Sync Gmail on mount and provide manual sync
+    const handleSync = useCallback(async () => {
+        setIsSyncing(true);
+        try {
+            const result = await syncGmail();
+            if (result.synced > 0) {
+                queryClient.invalidateQueries({ queryKey: ["conversations"] });
+            }
+        } catch (err) {
+            // Gmail may not be connected — silently ignore
+        } finally {
+            setIsSyncing(false);
+        }
+    }, [queryClient]);
+
+    useEffect(() => {
+        handleSync();
+    }, [handleSync]);
 
     // Count unread for badge
     const unreadCount = threads?.filter(t => !t.is_read && !t.is_archived).length ?? 0;
@@ -196,12 +217,23 @@ export function ThreadList({ onSelect, activeId }: ThreadListProps) {
                 <span className="text-[10px] font-medium text-slate-300">
                     {filteredThreads?.length ?? 0} of {threads?.length ?? 0} shown
                 </span>
-                <div className="flex items-center gap-2">
-                    <div className="relative">
-                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping absolute inset-0 opacity-40" />
-                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={handleSync}
+                        disabled={isSyncing}
+                        className="flex items-center gap-1.5 text-[10px] font-medium text-slate-400 hover:text-slate-600 transition-colors disabled:opacity-50"
+                        title="Sync Gmail inbox"
+                    >
+                        <RefreshCw className={`w-3 h-3 ${isSyncing ? "animate-spin" : ""}`} />
+                        Sync
+                    </button>
+                    <div className="flex items-center gap-2">
+                        <div className="relative">
+                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping absolute inset-0 opacity-40" />
+                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                        </div>
+                        <span className="text-[10px] font-medium text-slate-400">Live</span>
                     </div>
-                    <span className="text-[10px] font-medium text-slate-400">Live</span>
                 </div>
             </div>
         </div>

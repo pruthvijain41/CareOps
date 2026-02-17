@@ -358,6 +358,12 @@ export async function connectWhatsApp(): Promise<{ success: boolean; state: stri
     return response.data;
 }
 
+/** Sync Gmail inbox — polls for new messages since last sync */
+export async function syncGmail(): Promise<{ status: string; synced: number; history_id?: string }> {
+    const response = await api.post("/api/v1/gmail/sync");
+    return response.data;
+}
+
 
 /** List all bookings */
 export async function listBookings() {
@@ -439,6 +445,50 @@ export async function disconnectIntegration(provider: string) {
 export async function healthCheck() {
     // Add timestamp to bust any cache
     const response = await api.get(`/health?t=${Date.now()}`);
+    return response.data;
+}
+
+// ── Leads ───────────────────────────────────────────────────────────────────
+
+/** List leads with optional filters */
+export async function listLeads(params?: {
+    status?: string;
+    source?: string;
+    search?: string;
+    date_from?: string;
+    date_to?: string;
+}) {
+    const response = await api.get("/api/v1/leads", { params });
+    return response.data;
+}
+
+/** Create a lead manually */
+export async function createLead(data: {
+    full_name: string;
+    email?: string;
+    phone?: string;
+    lead_source?: string;
+    lead_notes?: string;
+}) {
+    const response = await api.post("/api/v1/leads", data);
+    return response.data;
+}
+
+/** Update lead status */
+export async function updateLeadStatus(leadId: string, status: string) {
+    const response = await api.patch(`/api/v1/leads/${leadId}/status`, { status });
+    return response.data;
+}
+
+/** Update lead notes */
+export async function updateLeadNotes(leadId: string, notes: string) {
+    const response = await api.patch(`/api/v1/leads/${leadId}/notes`, { notes });
+    return response.data;
+}
+
+/** Get lead pipeline metrics */
+export async function getLeadMetrics() {
+    const response = await api.get("/api/v1/leads/metrics");
     return response.data;
 }
 

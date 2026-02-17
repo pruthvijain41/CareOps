@@ -37,6 +37,7 @@ import {
     UserCheck,
     ChevronRight,
     MoreHorizontal,
+    TrendingUp,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -75,6 +76,12 @@ const PERMISSION_OPTIONS: {
             icon: <Inbox className="w-4 h-4" />,
         },
         {
+            key: "leads",
+            label: "Leads",
+            description: "View and manage lead pipeline",
+            icon: <TrendingUp className="w-4 h-4" />,
+        },
+        {
             key: "bookings",
             label: "Bookings",
             description: "View and manage appointments",
@@ -102,6 +109,7 @@ const PERMISSION_OPTIONS: {
 
 const DEFAULT_PERMS: Permissions = {
     inbox: false,
+    leads: false,
     bookings: false,
     forms: false,
     inventory: false,

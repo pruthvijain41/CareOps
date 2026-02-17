@@ -22,4 +22,5 @@ echo "📱 WhatsApp bridge scheduled (PID: $BRIDGE_PID)"
 
 # ── Start FastAPI backend as main process (exec replaces shell) ──────────────
 echo "🔧 Starting FastAPI backend on port $PORT..."
+source venv/bin/activate
 exec uvicorn app.main:app --host 0.0.0.0 --port "${PORT:-8000}" --limit-max-requests 1000

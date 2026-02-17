@@ -535,8 +535,135 @@ async def connect_whatsapp(
         logger.error("WhatsApp bridge connect failed: %s", exc)
         return {"success": False, "error": str(exc), "state": "disconnected", "qr": None}
 
+# ── Gmail Sync (Polling) ────────────────────────────────────────────────────
+
+
+@router.post(
+    "/gmail/sync",
+    summary="Sync Gmail inbox",
+    description="Poll Gmail API for new incoming messages and insert them into conversations.",
+)
+async def sync_gmail(
+    current_user: CurrentUser = None,  # type: ignore[assignment]
+    db: SupabaseClient = None,  # type: ignore[assignment]
+    settings: AppSettings = None,  # type: ignore[assignment]
+) -> dict[str, Any]:
+    """
+    Poll Gmail for new messages since last sync:
+    1. Get workspace's Gmail integration + stored last_history_id
+    2. Call history.list to find new messages
+    3. Filter to only incoming (not from connected email)
+    4. Insert each new message into the correct conversation
+    5. Update last_history_id (stored in credentials JSONB)
+    """
+    user_id = current_user.get("id")
+    profile = db.table("profiles").select("workspace_id").eq("id", user_id).single().execute()
+    if not profile.data:
+        raise HTTPException(status_code=403, detail="Profile not found")
+    workspace_id = profile.data["workspace_id"]
+
+    # Get Gmail integration
+    integration = (
+        db.table("integrations")
+        .select("id, credentials, connected_email")
+        .eq("workspace_id", workspace_id)
+        .eq("provider", "gmail")
+        .eq("is_active", True)
+        .limit(1)
+        .execute()
+    )
+
+    if not integration.data:
+        return {"status": "skipped", "reason": "Gmail not connected", "synced": 0}
+
+    integ = integration.data[0]
+    creds = integ.get("credentials") or {}
+    last_history_id = creds.get("last_history_id")
+
+    gmail = GmailService(settings, db)
+    new_messages = await gmail.fetch_new_messages(workspace_id, last_history_id)
+
+    if not new_messages:
+        return {"status": "ok", "synced": 0}
+
+    # Extract the new historyId (always present in the last element)
+    new_history_id = None
+    for msg in new_messages:
+        if "_new_history_id" in msg:
+            new_history_id = msg["_new_history_id"]
+
+    # Filter out metadata-only entries
+    real_messages = [m for m in new_messages if "body" in m and "from_email" in m]
+
+    synced_count = 0
+    for msg in real_messages:
+        try:
+            from_email = msg["from_email"]
+            from_name = msg.get("from_name", from_email.split("@")[0])
+            subject = msg.get("subject", "Gmail conversation")
+            body = msg.get("body", msg.get("snippet", ""))
+            thread_id = msg.get("threadId")
+            msg_id = msg.get("id")
+
+            # Find or create contact
+            contact = _find_or_create_contact(
+                db=db,
+                workspace_id=workspace_id,
+                email=from_email,
+                full_name=from_name,
+            )
+
+            # Upsert conversation (keyed by Gmail threadId)
+            conversation = _upsert_conversation(
+                db=db,
+                workspace_id=workspace_id,
+                contact_id=contact["id"],
+                channel="gmail",
+                external_thread_id=f"gmail_{thread_id}" if thread_id else None,
+                subject=subject,
+            )
+
+            # Check for duplicate message
+            if msg_id:
+                existing = (
+                    db.table("messages")
+                    .select("id")
+                    .eq("external_id", f"gmail_msg_{msg_id}")
+                    .limit(1)
+                    .execute()
+                )
+                if existing.data:
+                    continue  # Skip duplicate
+
+            # Insert message
+            _insert_message(
+                db=db,
+                conversation_id=conversation["id"],
+                workspace_id=workspace_id,
+                body=body,
+                source="gmail",
+                sender_type="contact",
+                sender_id=contact["id"],
+                external_id=f"gmail_msg_{msg_id}" if msg_id else None,
+            )
+            synced_count += 1
+            logger.info("📬 Gmail sync: new message from %s in conversation %s", from_email, conversation["id"])
+        except Exception as exc:
+            logger.warning("Gmail sync: failed to process message: %s", exc)
+
+    # Update last_history_id in credentials JSONB
+    if new_history_id:
+        updated_creds = {**creds, "last_history_id": new_history_id}
+        try:
+            db.table("integrations").update({"credentials": updated_creds}).eq("id", integ["id"]).execute()
+        except Exception as exc:
+            logger.warning("Failed to update Gmail history_id: %s", exc)
+
+    return {"status": "ok", "synced": synced_count, "history_id": new_history_id}
+
 
 # ── Inbox ────────────────────────────────────────────────────────────────────
+
 
 
 @router.get(
@@ -1015,3 +1142,218 @@ async def reply_to_thread(
         logger.warning("⏸️ Could not set automation_paused (column may not exist): %s", exc)
 
     return MessageResponse(**message)
+
+
+# ── Leads ────────────────────────────────────────────────────────────────────
+
+VALID_LEAD_STATUSES = [
+    "new", "contacted", "in_progress", "qualified",
+    "booking_sent", "converted", "lost",
+]
+
+VALID_LEAD_SOURCES = [
+    "contact_form", "gmail", "telegram", "whatsapp", "manual", "unknown",
+]
+
+
+@router.get(
+    "/leads",
+    summary="List leads",
+    description="Fetch all leads (contacts with lead pipeline data), with optional filters.",
+)
+async def list_leads(
+    status: str | None = None,
+    source: str | None = None,
+    search: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+    current_user: CurrentUser = None,  # type: ignore[assignment]
+    db: SupabaseClient = None,  # type: ignore[assignment]
+) -> list[dict[str, Any]]:
+    """List leads with optional filters."""
+    user_id = current_user.get("id")
+    profile = db.table("profiles").select("workspace_id").eq("id", user_id).single().execute()
+    if not profile.data:
+        raise HTTPException(status_code=403, detail="Profile not found")
+    workspace_id = profile.data["workspace_id"]
+
+    req = (
+        db.table("contacts")
+        .select("*, conversations(id, last_message_at, channel), bookings(id, status, starts_at)")
+        .eq("workspace_id", workspace_id)
+        .order("created_at", desc=True)
+    )
+
+    if status:
+        req = req.eq("lead_status", status)
+    if source:
+        req = req.eq("lead_source", source)
+    if search:
+        req = req.or_(f"full_name.ilike.%{search}%,email.ilike.%{search}%,phone.ilike.%{search}%")
+    if date_from:
+        req = req.gte("created_at", date_from)
+    if date_to:
+        req = req.lte("created_at", date_to)
+
+    result = req.limit(200).execute()
+    return result.data or []
+
+
+@router.post(
+    "/leads",
+    status_code=status.HTTP_201_CREATED,
+    summary="Create a lead manually",
+    description="Manually add a new lead (contact) with lead pipeline data.",
+)
+async def create_lead(
+    data: dict[str, Any],
+    current_user: CurrentUser = None,  # type: ignore[assignment]
+    db: SupabaseClient = None,  # type: ignore[assignment]
+) -> dict[str, Any]:
+    """Manually create a new lead."""
+    user_id = current_user.get("id")
+    profile = db.table("profiles").select("workspace_id").eq("id", user_id).single().execute()
+    if not profile.data:
+        raise HTTPException(status_code=403, detail="Profile not found")
+    workspace_id = profile.data["workspace_id"]
+
+    full_name = data.get("full_name", "").strip()
+    if not full_name:
+        raise HTTPException(status_code=400, detail="Name is required")
+
+    lead_record = {
+        "workspace_id": workspace_id,
+        "full_name": full_name,
+        "email": data.get("email", "").strip() or None,
+        "phone": data.get("phone", "").strip() or None,
+        "lead_status": "new",
+        "lead_source": data.get("lead_source", "manual"),
+        "lead_notes": data.get("lead_notes", "").strip() or None,
+    }
+
+    result = db.table("contacts").insert(lead_record).execute()
+    if not result.data:
+        raise HTTPException(status_code=500, detail="Failed to create lead")
+
+    return result.data[0]
+
+
+@router.patch(
+    "/leads/{lead_id}/status",
+    summary="Update lead status",
+    description="Change the pipeline status of a lead.",
+)
+async def update_lead_status(
+    lead_id: UUID,
+    data: dict[str, Any],
+    current_user: CurrentUser = None,  # type: ignore[assignment]
+    db: SupabaseClient = None,  # type: ignore[assignment]
+) -> dict[str, Any]:
+    """Update a lead's pipeline status."""
+    new_status = data.get("status", "")
+    if new_status not in VALID_LEAD_STATUSES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid status. Must be one of: {', '.join(VALID_LEAD_STATUSES)}",
+        )
+
+    user_id = current_user.get("id")
+    profile = db.table("profiles").select("workspace_id").eq("id", user_id).single().execute()
+    if not profile.data:
+        raise HTTPException(status_code=403, detail="Profile not found")
+    workspace_id = profile.data["workspace_id"]
+
+    update_payload: dict[str, Any] = {"lead_status": new_status}
+    # If marking as contacted or beyond, set last_contacted_at
+    if new_status in ("contacted", "in_progress", "qualified", "booking_sent"):
+        update_payload["last_contacted_at"] = datetime.now(timezone.utc).isoformat()
+
+    result = (
+        db.table("contacts")
+        .update(update_payload)
+        .eq("id", str(lead_id))
+        .eq("workspace_id", workspace_id)
+        .execute()
+    )
+
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    return result.data[0]
+
+
+@router.patch(
+    "/leads/{lead_id}/notes",
+    summary="Update lead notes",
+    description="Add or update notes on a lead.",
+)
+async def update_lead_notes(
+    lead_id: UUID,
+    data: dict[str, Any],
+    current_user: CurrentUser = None,  # type: ignore[assignment]
+    db: SupabaseClient = None,  # type: ignore[assignment]
+) -> dict[str, Any]:
+    """Update a lead's notes."""
+    user_id = current_user.get("id")
+    profile = db.table("profiles").select("workspace_id").eq("id", user_id).single().execute()
+    if not profile.data:
+        raise HTTPException(status_code=403, detail="Profile not found")
+    workspace_id = profile.data["workspace_id"]
+
+    result = (
+        db.table("contacts")
+        .update({"lead_notes": data.get("notes", "")})
+        .eq("id", str(lead_id))
+        .eq("workspace_id", workspace_id)
+        .execute()
+    )
+
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    return result.data[0]
+
+
+@router.get(
+    "/leads/metrics",
+    summary="Lead pipeline metrics",
+    description="Get lead funnel summary: totals by status and conversion rate.",
+)
+async def get_lead_metrics(
+    current_user: CurrentUser = None,  # type: ignore[assignment]
+    db: SupabaseClient = None,  # type: ignore[assignment]
+) -> dict[str, Any]:
+    """Get lead pipeline metrics."""
+    user_id = current_user.get("id")
+    profile = db.table("profiles").select("workspace_id").eq("id", user_id).single().execute()
+    if not profile.data:
+        raise HTTPException(status_code=403, detail="Profile not found")
+    workspace_id = profile.data["workspace_id"]
+
+    all_contacts = (
+        db.table("contacts")
+        .select("lead_status")
+        .eq("workspace_id", workspace_id)
+        .execute()
+    )
+
+    leads = all_contacts.data or []
+    total = len(leads)
+
+    counts: dict[str, int] = {}
+    for lead in leads:
+        s = lead.get("lead_status", "new")
+        counts[s] = counts.get(s, 0) + 1
+
+    converted = counts.get("converted", 0)
+    conversion_rate = round((converted / total * 100), 1) if total > 0 else 0.0
+
+    return {
+        "total": total,
+        "new": counts.get("new", 0),
+        "contacted": counts.get("contacted", 0),
+        "in_progress": counts.get("in_progress", 0),
+        "qualified": counts.get("qualified", 0),
+        "booking_sent": counts.get("booking_sent", 0),
+        "converted": converted,
+        "lost": counts.get("lost", 0),
+        "conversion_rate": conversion_rate,
+    }

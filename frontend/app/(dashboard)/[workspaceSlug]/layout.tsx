@@ -17,7 +17,7 @@ import {
 import {
     LayoutDashboard, Inbox, CalendarDays, ClipboardList,
     Package, Users, Zap, Settings, LogOut, ChevronDown,
-    Bell, CheckCircle2, XCircle, AlertTriangle, X, Loader2,
+    Bell, CheckCircle2, XCircle, AlertTriangle, X, Loader2, UserPlus,
 } from "lucide-react";
 import api from "@/lib/api";
 import { WakeupGate } from "@/components/auth/wakeup-screen";
@@ -53,6 +53,7 @@ function timeAgo(iso: string) {
 const NAV_ITEMS = [
     { label: "Dashboard", href: "", icon: LayoutDashboard, ownerOnly: false, permKey: "reports" as keyof Permissions },
     { label: "Inbox", href: "/inbox", icon: Inbox, ownerOnly: false, permKey: "inbox" as keyof Permissions },
+    { label: "Leads", href: "/leads", icon: UserPlus, ownerOnly: false, permKey: "inbox" as keyof Permissions },
     { label: "Bookings", href: "/bookings", icon: CalendarDays, ownerOnly: false, permKey: "bookings" as keyof Permissions },
     { label: "Forms", href: "/forms", icon: ClipboardList, ownerOnly: false, permKey: "forms" as keyof Permissions },
     { label: "Inventory", href: "/inventory", icon: Package, ownerOnly: false, permKey: "inventory" as keyof Permissions },
@@ -63,6 +64,7 @@ const NAV_ITEMS = [
 
 const DEFAULT_PERMISSIONS: Permissions = {
     inbox: true,
+    leads: true,
     bookings: true,
     forms: true,
     inventory: false,

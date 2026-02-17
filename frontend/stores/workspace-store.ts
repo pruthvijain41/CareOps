@@ -7,6 +7,7 @@ export type UserRole = "owner" | "staff";
 
 export interface Permissions {
     inbox: boolean;
+    leads: boolean;
     bookings: boolean;
     forms: boolean;
     inventory: boolean;

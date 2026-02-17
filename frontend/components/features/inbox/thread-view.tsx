@@ -76,6 +76,7 @@ export function ThreadView({ threadId }: ThreadViewProps) {
         queryKey: ["thread", threadId],
         queryFn: () => getInboxThread(threadId),
         enabled: !!threadId,
+        refetchInterval: 10000,
     });
 
     // When thread loads and is marked as read on backend, refetch conversations list

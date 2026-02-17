@@ -201,6 +201,102 @@ class GmailService:
             logger.error("Failed to fetch Gmail message %s: %s", message_id, exc)
             return {"error": str(exc)}
 
+    async def fetch_new_messages(
+        self, workspace_id: str, start_history_id: str | None = None
+    ) -> list[dict[str, Any]]:
+        """
+        Fetch new incoming messages since start_history_id using Gmail history.list.
+        Returns a list of message dicts with subject, body, from_email, threadId, etc.
+        """
+        service = self._get_service(workspace_id)
+        if not service:
+            return []
+
+        # Get the connected email for this workspace so we can filter out our own sent messages
+        connected_email = await self.get_connected_email(workspace_id)
+
+        try:
+            # If no historyId, get the latest one and return empty (first sync)
+            if not start_history_id:
+                profile = service.users().getProfile(userId="me").execute()
+                return [{"_new_history_id": profile.get("historyId")}]
+
+            # Fetch history since the given historyId
+            history_response = (
+                service.users()
+                .history()
+                .list(
+                    userId="me",
+                    startHistoryId=start_history_id,
+                    historyTypes=["messageAdded"],
+                )
+                .execute()
+            )
+
+            new_history_id = history_response.get("historyId", start_history_id)
+            history_records = history_response.get("history", [])
+
+            if not history_records:
+                return [{"_new_history_id": new_history_id}]
+
+            # Collect unique message IDs from history
+            seen_ids: set[str] = set()
+            messages: list[dict[str, Any]] = []
+
+            for record in history_records:
+                for msg_added in record.get("messagesAdded", []):
+                    msg_meta = msg_added.get("message", {})
+                    msg_id = msg_meta.get("id")
+                    label_ids = msg_meta.get("labelIds", [])
+
+                    # Only process INBOX messages (skip SENT, DRAFT, etc.)
+                    if msg_id and msg_id not in seen_ids and "INBOX" in label_ids:
+                        seen_ids.add(msg_id)
+
+                        # Fetch full message
+                        msg_data = await self.fetch_message(workspace_id, msg_id)
+                        if "error" in msg_data:
+                            continue
+
+                        # Extract sender email from headers
+                        full_msg = (
+                            service.users()
+                            .messages()
+                            .get(userId="me", id=msg_id, format="metadata", metadataHeaders=["From"])
+                            .execute()
+                        )
+                        from_header = ""
+                        for h in full_msg.get("payload", {}).get("headers", []):
+                            if h["name"].lower() == "from":
+                                from_header = h["value"]
+                                break
+
+                        # Parse email from "Name <email>" format
+                        import re
+                        email_match = re.search(r"<([^>]+)>", from_header)
+                        from_email = email_match.group(1) if email_match else from_header.strip()
+
+                        # Skip messages sent by the workspace's own connected email
+                        if connected_email and from_email.lower() == connected_email.lower():
+                            continue
+
+                        msg_data["from_email"] = from_email
+                        msg_data["from_name"] = from_header.split("<")[0].strip().strip('"') or from_email
+                        messages.append(msg_data)
+
+            # Always include the new historyId for the caller to store
+            if messages:
+                messages[-1]["_new_history_id"] = new_history_id
+            else:
+                messages.append({"_new_history_id": new_history_id})
+
+            return messages
+
+        except Exception as exc:
+            logger.error("Failed to fetch new Gmail messages: %s", exc)
+            return []
+
     async def health_check(self, workspace_id: str) -> bool:
         """Check if Gmail is connected and credentials are valid."""
         return await self.is_connected(workspace_id)
+
